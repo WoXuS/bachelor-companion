@@ -1,0 +1,71 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+model Participant {
+  id        String   @id @default(cuid())
+  name      String
+  avatarUrl String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  balance   Int      @default(0)
+  Transactions Transaction[]
+  TournamentParticipants TournamentParticipant[]
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  amount        Int
+  reason        String
+  createdAt     DateTime @default(now())
+}
+
+model Prize {
+  id        String   @id @default(cuid())
+  place     Int
+  title     String
+  imageUrl  String?
+  description String?
+  createdAt DateTime @default(now())
+}
+
+model ShopItem {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  cost      Int
+  category  String
+  createdAt DateTime @default(now())
+}
+
+model Tournament {
+  id        String   @id @default(cuid())
+  title     String
+  status    String   @default("draft") // draft|active|done
+  createdAt DateTime @default(now())
+  matches   Match[]
+  participants TournamentParticipant[]
+}
+
+model TournamentParticipant {
+  id            String  @id @default(cuid())
+  tournamentId  String
+  participantId String
+  tournament    Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+}
+
+model Match {
+  id            String   @id @default(cuid())
+  tournamentId  String
+  round         Int
+  orderInRound  Int
+  aId           String?
+  bId           String?
+  scoreA        Int?      @default(0)
+  scoreB        Int?      @default(0)
+  winnerId      String?
+  nextMatchId   String?
+  tournament    Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+}
