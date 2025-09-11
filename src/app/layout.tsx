@@ -3,6 +3,8 @@ import {Inter} from 'next/font/google'
 import './globals.css'
 import {QueryProvider} from '@/providers/query'
 import React from "react";
+import LogoutButton from "@/components/auth/LogoutButton";
+import {isAdminServer} from '@/lib/session'
 
 const inter = Inter({
     subsets: ['latin'],
@@ -15,12 +17,16 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({children,}: { children: React.ReactNode }) {
+
     return (
         <html lang="pl">
         <body
             className={`${inter.variable} antialiased bg-[#1f1f1f] dark`}
         >
         <QueryProvider>{children}</QueryProvider>
+        {isAdminServer() &&
+            <LogoutButton/>
+        }
         </body>
         </html>
     )

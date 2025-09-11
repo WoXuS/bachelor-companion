@@ -6,15 +6,12 @@ import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {useState} from 'react'
+import {Loader} from '@/components/ui/Loader'
+import {ParticipantDto} from "@/types/participant";
+import {getAdmin} from "@/hooks/useAdmin";
+import {Receipt} from "lucide-react";
 
-type Participant = {
-    id: string
-    name: string
-    balance: number
-    avatarUrl: string | null
-}
-
-async function fetchRanking(): Promise<Participant[]> {
+async function fetchRanking(): Promise<ParticipantDto[]> {
     const res = await fetch('/api/ranking')
     if (!res.ok) throw new Error('Failed to fetch ranking')
     return res.json()
@@ -32,15 +29,28 @@ async function addTransaction(id: string, amount: number, reason: string) {
 
 export default function RankingPage() {
     const queryClient = useQueryClient()
-    const {data: ranking = []} = useQuery({queryKey: ['ranking'], queryFn: fetchRanking})
+    const {data: ranking = [], isLoading, isError} = useQuery({queryKey: ['ranking'], queryFn: fetchRanking})
+
+    const {data} = useQuery({queryKey: ['me'], queryFn: getAdmin})
+    const isAdmin = !!data?.isAdmin
+
+    const [isOpen, setIsOpen] = useState(false);
+
     const mutation = useMutation({
         mutationFn: ({id, amount, reason}: { id: string; amount: number; reason: string }) =>
             addTransaction(id, amount, reason),
-        onSuccess: () => queryClient.invalidateQueries({queryKey: ['ranking']}),
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['ranking']})
+            setIsOpen(false)
+        },
     })
 
     const podium = ranking.slice(0, 3)
     const rest = ranking.slice(3)
+
+
+    if (isLoading) return <Loader/>
+    if (isError) return <p>Coś poszło nie tak</p>
 
     return (
         <div className="max-w-2xl mx-auto p-4 flex flex-col gap-4">
@@ -48,32 +58,37 @@ export default function RankingPage() {
 
             <Podium
                 top3={podium}
-                onSubmit={({ id, amount, reason }) =>
-                    mutation.mutate({ id, amount, reason })
+                onSubmit={({id, amount, reason}) =>
+                    mutation.mutate({id, amount, reason})
                 }
+                isAdmin={isAdmin}
             />
 
-            {/* Reszta */}
-            <ul className="p-5 rounded-2xl bg-[#3a1a46] flex flex-col gap-3">
+            <ul className="p-3 rounded-lg bg-foreground flex flex-col gap-3">
                 {rest.map((p, idx) => (
                     <li
                         key={p.id}
-                        className="flex items-center justify-between rounded-lg p-3 shadow-sm bg-[#9e4f7f]"
+                        className="flex items-center justify-between rounded-md shadow-sm bg-primary"
                     >
-                        <div className="flex items-center gap-3">
-                            <p>{idx+4}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="bg-primary-foreground rounded-e-4xl rounded-s-[10%] py-3 w-15 h-[76px] flex items-center justify-center">{idx + 4}</p>
                             <Image
                                 src={p.avatarUrl ?? '/images/participants/default.png'}
                                 alt={p.name}
                                 width={60}
                                 height={60}
-                                className="rounded-full"
+                                className="rounded-full py-2"
                             />
                             <span className="font-medium">{p.name}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-lg font-bold">{p.balance}</span>
-                            <AddPointsDialog participantId={p.id} mutate={mutation.mutate}/>
+                        <div className="flex items-center gap-2 pr-3">
+                            <div className="bg-primary-foreground/70 rounded-md px-5 sm:px-3 text-lg font-bold flex items-center justify-center gap-[3px]">
+                                <Receipt size="24"/>
+                                <p>{p.balance}</p>
+                            </div>
+                            {isAdmin && (
+                                <AddPointsDialog participantId={p.id} mutate={mutation.mutate} isOpen={isOpen} setIsOpen={()=> setIsOpen(true)}/>
+                            )}
                         </div>
                     </li>
                 ))}
@@ -85,17 +100,21 @@ export default function RankingPage() {
 function AddPointsDialog({
                              participantId,
                              mutate,
+                             isOpen,
+    setIsOpen
                          }: {
     participantId: string
     mutate: (input: { id: string; amount: number; reason: string }) => void
+    isOpen:boolean
+    setIsOpen: () => void
 }) {
     const [amount, setAmount] = useState(1)
     const [reason, setReason] = useState('')
 
     return (
-        <Dialog>
+        <Dialog open={isOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" variant="secondary">
+                <Button size="sm" variant="destructive" onClick={()=> setIsOpen()}>
                     +
                 </Button>
             </DialogTrigger>

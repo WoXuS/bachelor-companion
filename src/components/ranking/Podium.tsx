@@ -1,11 +1,11 @@
 'use client'
 
 import Image from 'next/image'
-import {Crown} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {useState} from 'react'
+import { Receipt } from 'lucide-react';
 
 type Participant = {
     id: string
@@ -14,19 +14,20 @@ type Participant = {
     avatarUrl: string | null
 }
 
-export function Podium({top3, onSubmit,}: {
+export function Podium({top3, onSubmit, isAdmin}: {
     top3: Participant[]
     onSubmit: (payload: { id: string; amount: number; reason: string }) => void
+    isAdmin: boolean
 }) {
     const [first, second, third] = [top3[0], top3[1], top3[2]].filter(Boolean)
 
     return (
         <div className="w-full">
             {/* Desktop/tablet: schodki */}
-            <div className="flex items-end justify-center gap-6">
-                {second && <PodiumColumn place={2} p={second} onSubmit={onSubmit} heightClass="h-32"/>}
-                {first && <PodiumColumn place={1} p={first} onSubmit={onSubmit} heightClass="h-36" highlight/>}
-                {third && <PodiumColumn place={3} p={third} onSubmit={onSubmit} heightClass="h-30"/>}
+            <div className="flex items-end justify-center gap-2">
+                {second && <PodiumColumn place={2} p={second} onSubmit={onSubmit} heightClass="mb-2" isAdmin={isAdmin}/>}
+                {first && <PodiumColumn place={1} p={first} onSubmit={onSubmit} heightClass="mb-5" isAdmin={isAdmin}/>}
+                {third && <PodiumColumn place={3} p={third} onSubmit={onSubmit} isAdmin={isAdmin}/>}
             </div>
 
         </div>
@@ -38,13 +39,13 @@ function PodiumColumn({
                           p,
                           onSubmit,
                           heightClass,
-                          highlight = false,
+                          isAdmin
                       }: {
     place: 1 | 2 | 3
     p: Participant
     onSubmit: (payload: { id: string; amount: number; reason: string }) => void
-    heightClass: string
-    highlight?: boolean
+    heightClass?: string
+    isAdmin: boolean
 }) {
     const podiumImg =
         place === 1
@@ -54,35 +55,40 @@ function PodiumColumn({
                 : 'bg-[url(/images/podium/3rd.png)]'
 
     return (
-        <div className="flex flex-col items-center">
-            <div className="relative -mb-6 z-20">
+        <div className="flex flex-col items-center flex-1">
+            <div className="relative max-w-[150px]">
                 <Image
                     src={p.avatarUrl ?? '/images/participants/default.png'}
                     alt={p.name}
-                    width={place === 1 ? 150 : place === 2 ? 140 : 130}
-                    height={place === 1 ? 150 : place === 2 ? 140 : 130}
-                    className="max-w-[150px]"
+                    width={512}
+                    height={512}
+                    className="w-full"
                 />
                 <Image
                     src={place === 1 ? '/images/podium/1st-medal.png' : place === 2 ? '/images/podium/2nd-medal.png' : '/images/podium/3rd-medal.png'}
                     alt={p.name}
-                    width={25}
-                    height={31}
-                    className="absolute bottom-3 right-1" aria-hidden="true"
+                    width={100}
+                    height={124}
+                    className="absolute bottom-0 right-1 max-w-[25px]" aria-hidden="true"
                 />
             </div>
 
             <div
-                className={`relative ${heightClass} w-40 rounded-xl ${podiumImg} bg-center bg-contain bg-no-repeat flex flex-col items-center p-3 pt-7`}
+                className={`relative ${heightClass} h-[clamp(92px,22vw,128px)] max-w-50 w-full rounded-xl ${podiumImg} bg-top bg-contain bg-no-repeat flex flex-col items-center p-3 pt-4 sm:pt-5`}
             >
-                <div className="flex flex-col gap-2 items-center">
-                    <h3 className="text-xl font-bold">{p.name}</h3>
-                    <div className="bg-black/40 font-bold rounded-md text-center w-[100px]">{p.balance}</div>
+                <div className="flex flex-col gap-2 items-center sm:w-[50%] w-[65%]">
+                    <h3 className="text-md sm:text-xl font-bold">{p.name}</h3>
+                    <div
+                        className="bg-primary-foreground/70 font-bold rounded-md px-5 sm:px-4 text-md sm:text-xl flex items-center justify-center gap-[3px]">
+                        <Receipt size="16"/>
+                        {p.balance}
+                    </div>
                 </div>
-
-                <div className="absolute bottom-2 -right-2">
-                    <AddPointsDialog participantId={p.id} onSubmit={onSubmit}/>
-                </div>
+                {isAdmin && (
+                    <div className="absolute right-[50%] transform-[translateX(50%)] -bottom-3">
+                        <AddPointsDialog participantId={p.id} onSubmit={onSubmit}/>
+                    </div>)
+                }
             </div>
         </div>
     )
@@ -101,7 +107,7 @@ function AddPointsDialog({
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button size="sm" variant="secondary">+</Button>
+                <Button size="sm" variant="destructive">+</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
