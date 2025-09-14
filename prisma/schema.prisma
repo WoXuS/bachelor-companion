@@ -8,13 +8,17 @@ datasource db {
 }
 
 model Participant {
-  id                     String                  @id @default(cuid())
-  name                   String                  @unique
-  avatarUrl              String?
-  active                 Boolean                 @default(true)
-  createdAt              DateTime                @default(now())
-  balance                Int                     @default(0)
-  Transactions           Transaction[]
+  id        String   @id @default(cuid())
+  name      String   @unique
+  avatarUrl String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  balance   Int      @default(0)
+
+  Transactions Transaction[]
+
+  CounterpartyTxs Transaction[] @relation("TxCounterparty")
+
   TournamentParticipants TournamentParticipant[]
 }
 
@@ -22,9 +26,14 @@ model Transaction {
   id            String      @id @default(cuid())
   participantId String
   participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  amount        Int
-  reason        String
-  createdAt     DateTime    @default(now())
+
+  amount       Int
+  reason       String
+  createdAt    DateTime @default(now())
+  balanceAfter Int?
+
+  counterpartyId String?
+  counterparty   Participant? @relation("TxCounterparty", fields: [counterpartyId], references: [id])
 }
 
 model Prize {

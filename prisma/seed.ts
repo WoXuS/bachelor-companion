@@ -4,18 +4,18 @@ const prisma = new PrismaClient()
 
 async function main() {
     const names = [
-        {name: 'Antoni', avatarUrl: '/images/participants/antoni.png'},
-        {name: 'Borys', avatarUrl: '/images/participants/borys.png'},
-        {name: 'Cezary', avatarUrl: '/images/participants/cezary.png'},
-        {name: 'Damian', avatarUrl: '/images/participants/damian.png'},
-        {name: 'Emil', avatarUrl: '/images/participants/emil.png'},
-        {name: 'Filip', avatarUrl: '/images/participants/filip.png'},
-        {name: 'Gabriel', avatarUrl: '/images/participants/gabriel.png'},
-        {name: 'Henryk', avatarUrl: '/images/participants/henryk.png'},
-        {name: 'Igor', avatarUrl: '/images/participants/igor.png'},
-        {name: 'Julian', avatarUrl: '/images/participants/julian.png'},
-        {name: 'Konrad', avatarUrl: '/images/participants/konrad.png'},
-        {name: 'Leon', avatarUrl: '/images/participants/leon.png'},
+        {name: 'Antoni', avatarUrl: '/images/participants/antoni.png', balance: 10},
+        {name: 'Borys', avatarUrl: '/images/participants/borys.png', balance: 10},
+        {name: 'Cezary', avatarUrl: '/images/participants/cezary.png', balance: 10},
+        {name: 'Damian', avatarUrl: '/images/participants/damian.png', balance: 10},
+        {name: 'Emil', avatarUrl: '/images/participants/emil.png', balance: 10},
+        {name: 'Filip', avatarUrl: '/images/participants/filip.png', balance: 10},
+        {name: 'Gabriel', avatarUrl: '/images/participants/gabriel.png', balance: 10},
+        {name: 'Henryk', avatarUrl: '/images/participants/henryk.png', balance: 10},
+        {name: 'Igor', avatarUrl: '/images/participants/igor.png', balance: 10},
+        {name: 'Julian', avatarUrl: '/images/participants/julian.png', balance: 10},
+        {name: 'Konrad', avatarUrl: '/images/participants/konrad.png', balance: 10},
+        {name: 'Leon', avatarUrl: '/images/participants/leon.png', balance: 10},
     ]
 
     await Promise.all(
@@ -85,12 +85,29 @@ async function main() {
         )
     )
 
-    const groom = await prisma.participant.findFirst({where: {name: 'Antoni'}})
+    const groom = await prisma.participant.findFirst({ where: { name: 'Antoni' } })
     if (groom) {
-        await prisma.transaction.create({
-            data: {participantId: groom.id, amount: 10, reason: 'Pan młody starter pack'}
+        await prisma.$transaction(async (tx) => {
+            const fresh = await tx.participant.findUnique({
+                where: { id: groom.id },
+                select: { balance: true },
+            })
+            const amount = 10
+            const newBalance = (fresh?.balance ?? 0) + amount
+
+            await tx.transaction.create({
+                data: {
+                    participantId: groom.id,
+                    amount,
+                    reason: 'Pan młody starter pack',
+                    balanceAfter: newBalance,
+                },
+            })
+            await tx.participant.update({
+                where: { id: groom.id },
+                data: { balance: newBalance },
+            })
         })
-        await prisma.participant.update({where: {id: groom.id}, data: {balance: {increment: 10}}})
     }
 }
 

@@ -23,7 +23,6 @@ export function Podium({top3, onSubmit, isAdmin}: {
 
     return (
         <div className="w-full">
-            {/* Desktop/tablet: schodki */}
             <div className="flex items-end justify-center gap-2">
                 {second && <PodiumColumn place={2} p={second} onSubmit={onSubmit} heightClass="mb-2" isAdmin={isAdmin}/>}
                 {first && <PodiumColumn place={1} p={first} onSubmit={onSubmit} heightClass="mb-5" isAdmin={isAdmin}/>}
@@ -77,7 +76,7 @@ function PodiumColumn({
                 className={`relative ${heightClass} h-[clamp(92px,22vw,128px)] max-w-50 w-full rounded-xl ${podiumImg} bg-top bg-contain bg-no-repeat flex flex-col items-center p-3 pt-4 sm:pt-5`}
             >
                 <div className="flex flex-col gap-2 items-center sm:w-[50%] w-[65%]">
-                    <h3 className="text-md sm:text-xl font-bold">{p.name}</h3>
+                    <h3 className="text-md sm:text-xl font-bold whitespace-nowrap">{p.name}</h3>
                     <div
                         className="bg-primary-foreground/70 font-bold rounded-md px-5 sm:px-4 text-md sm:text-xl flex items-center justify-center gap-[3px]">
                         <Receipt size="16"/>

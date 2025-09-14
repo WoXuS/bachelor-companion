@@ -1,6 +1,6 @@
 import Image from 'next/image'
 
-export function Loader() {
+export function CustomLoader() {
     return (
         <div className="w-[100vw] h-[100vh] flex items-center justify-center">
             <Image

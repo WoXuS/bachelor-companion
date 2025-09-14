@@ -1,13 +1,13 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { isAdminServer } from '@/lib/session'
+import {NextResponse} from 'next/server'
+import type {NextRequest} from 'next/server'
+import {isAdminServer} from '@/lib/session'
 
 export const config = {
     matcher: ['/admin/:path*', '/api/:path*'],
 }
 
 export function middleware(req: NextRequest) {
-    const { pathname } = req.nextUrl
+    const {pathname} = req.nextUrl
 
     const isLoginPage = pathname === '/admin/login'
     const isAuthRoute = pathname.startsWith('/api/auth/')
@@ -25,7 +25,7 @@ export function middleware(req: NextRequest) {
             url.pathname = '/admin/login'
             return NextResponse.redirect(url)
         }
-        return new NextResponse('Unauthorized', { status: 401 })
+        return NextResponse.json({message: 'Unauthorized'}, {status: 400})
     }
 
     return NextResponse.next()

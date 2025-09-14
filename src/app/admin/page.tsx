@@ -3,17 +3,22 @@ import { redirect } from 'next/navigation'
 import { isAdminServer } from '@/lib/session'
 import ParticipantsAdmin from './ParticipantsAdmin'
 import { Button } from '@/components/ui/button'
+import {ArrowRightLeft, Award, BanknoteArrowUp, NotepadText} from "lucide-react";
+import {Ranking} from "@/components/icons/Ranking";
+import {Tournament} from "@/components/icons/Tournament";
+import React from "react";
 
 export default function AdminPage() {
     if (!isAdminServer()) redirect('/admin/login')
 
     const links = [
-        { href: '/ranking', label: 'Ranking' },
-        { href: '/rewards', label: 'Nagrody' },
-        { href: '/tournaments', label: 'Turnieje' },
-        { href: '/', label: 'Cennik (home)' },
+        {href: '/', icon: <NotepadText size="32"/>, label: 'Cennik (home)'},
+        {href: '/ranking', icon: <Ranking size="32"/>, label: 'Ranking'},
+        {href: '/transactions', icon: <ArrowRightLeft size="32"/>, label: 'Historia punktów'},
+        {href: '/tournaments', icon: <Tournament size="32"/>, label: 'Turnieje'},
+        {href: '/rewards', icon: <Award size="32"/>, label: 'Nagrody'},
+        {href: '/how-to-earn', icon: <BanknoteArrowUp size="32"/>, label: 'Jak zarabiać dollary'},
     ]
-
     return (
         <div className="max-w-3xl mx-auto p-6 space-y-8">
             <header className="space-y-3">
@@ -21,7 +26,10 @@ export default function AdminPage() {
                 <nav className="grid sm:grid-cols-2 gap-3">
                     {links.map((l) => (
                         <Button asChild key={l.href} variant="secondary" className="justify-start">
-                            <Link href={l.href}>{l.label}</Link>
+                            <Link href={l.href}>
+                                {l.icon}
+                                {l.label}
+                            </Link>
                         </Button>
                     ))}
                 </nav>

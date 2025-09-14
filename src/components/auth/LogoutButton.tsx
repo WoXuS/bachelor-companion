@@ -26,9 +26,9 @@ export default function LogoutButton() {
     return (
 
         <Dialog open={open} onOpenChange={() => setOpen(!open)}>
-            <DialogTrigger asChild className="fixed bottom-2 right-2">
-                <Button variant="destructive" size="sm">
-                    <LogOut/>
+            <DialogTrigger asChild>
+                <Button variant="link" size="icon" className="text-destructive py-3 px-1 flex-1 flex justify-center">
+                    <LogOut size="24"/>
                 </Button>
             </DialogTrigger>
             <DialogContent>

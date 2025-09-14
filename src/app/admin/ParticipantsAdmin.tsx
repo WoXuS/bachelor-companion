@@ -11,6 +11,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog'
+import {CustomLoader} from "@/components/ui/CustomLoader";
 
 type Participant = {
     id: string
@@ -58,7 +59,7 @@ export default function ParticipantsAdmin() {
         onSuccess: () => qc.invalidateQueries({ queryKey: ['participants'] }),
     })
 
-    if (isLoading) return <p>Ładowanie…</p>
+    if (isLoading) return <CustomLoader/>
 
     return (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">

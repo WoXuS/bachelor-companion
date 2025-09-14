@@ -5,6 +5,8 @@ import {QueryProvider} from '@/providers/query'
 import React from "react";
 import LogoutButton from "@/components/auth/LogoutButton";
 import {isAdminServer} from '@/lib/session'
+import {Toaster} from "sonner";
+import {NavigationBar} from "@/components/ui/NavigationBar";
 
 const inter = Inter({
     subsets: ['latin'],
@@ -23,10 +25,12 @@ export default function RootLayout({children,}: { children: React.ReactNode }) {
         <body
             className={`${inter.variable} antialiased bg-[#1f1f1f] dark`}
         >
-        <QueryProvider>{children}</QueryProvider>
-        {isAdminServer() &&
-            <LogoutButton/>
-        }
+        <QueryProvider>
+            {children}
+            <NavigationBar/>
+        </QueryProvider>
+
+        <Toaster/>
         </body>
         </html>
     )
