@@ -20,7 +20,7 @@ export default function AdminPage() {
         {href: '/how-to-earn', icon: <BanknoteArrowUp size="32"/>, label: 'Jak zarabiać dollary'},
     ]
     return (
-        <div className="max-w-3xl mx-auto p-6 space-y-8">
+        <div className="max-w-3xl mx-auto p-6 space-y-8 pt-20">
             <header className="space-y-3">
                 <h1 className="text-2xl font-bold">Panel Admina</h1>
                 <nav className="grid sm:grid-cols-2 gap-3">

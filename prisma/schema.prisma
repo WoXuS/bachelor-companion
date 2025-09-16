@@ -20,6 +20,8 @@ model Participant {
   CounterpartyTxs Transaction[] @relation("TxCounterparty")
 
   TournamentParticipants TournamentParticipant[]
+
+  TournamentTeamMember TournamentTeamMember[]
 }
 
 model Transaction {
@@ -54,13 +56,22 @@ model ShopItem {
   createdAt DateTime @default(now())
 }
 
+enum TournamentType {
+  SOLO
+  TEAM
+}
+
 model Tournament {
-  id           String                  @id @default(cuid())
-  title        String
-  status       String                  @default("draft")
-  createdAt    DateTime                @default(now())
-  matches      Match[]
+  id            String         @id @default(cuid())
+  title         String
+  type          TournamentType
+  mainPrize     Int
+  matchWinPrize Int
+  createdAt     DateTime       @default(now())
+
   participants TournamentParticipant[]
+  teams        TournamentTeam[]
+  matches      Match[]
 }
 
 model TournamentParticipant {
@@ -73,16 +84,49 @@ model TournamentParticipant {
   @@unique([tournamentId, participantId])
 }
 
+model TournamentTeam {
+  id           String                 @id @default(cuid())
+  tournamentId String
+  name         String
+  tournament   Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  members      TournamentTeamMember[]
+}
+
+model TournamentTeamMember {
+  id            String         @id @default(cuid())
+  teamId        String
+  participantId String
+  team          TournamentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  participant   Participant    @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, participantId])
+}
+
 model Match {
   id           String     @id @default(cuid())
   tournamentId String
-  round        Int
-  orderInRound Int
-  aId          String?
-  bId          String?
-  scoreA       Int?       @default(0)
-  scoreB       Int?       @default(0)
-  winnerId     String?
-  nextMatchId  String?
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  round        Int
+  indexInRound Int
+
+  // SOLO:
+  participantAId      String?
+  participantBId      String?
+  winnerParticipantId String?
+
+  // TEAM:
+  teamAId      String?
+  teamBId      String?
+  winnerTeamId String?
+
+  scoreA Int?
+  scoreB Int?
+
+  nextMatchId String?
+  nextMatch   Match?  @relation("NextMatch", fields: [nextMatchId], references: [id])
+
+  previousMatches Match[] @relation("NextMatch")
+
+  isBye Boolean @default(false)
 }
