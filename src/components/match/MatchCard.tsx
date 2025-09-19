@@ -5,7 +5,6 @@ import {Input} from '@/components/ui/input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 import {toast} from 'sonner'
-import {computePrizeInfo} from '../utils/prize'
 import {TMatch, TTournament} from "@/types/tournament";
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {RefreshCw} from "lucide-react";
@@ -129,7 +128,7 @@ export function MatchCard({
         <div className={roundNumber != 1 ? 'flex items-center' : ''}
              style={roundNumber !== 1 ? {height: `${2 ** (roundNumber - 1) * cardHeight + (2 ** (roundNumber - 1) - 1) * 12}px`} : undefined}>
             <div
-                className={`rounded-lg border bg-white/5 p-2 flex flex-col gap-2 min-w-[160px] ${match.nextMatchId ? '' : 'border-amber-400'} ${roundNumber !== 1 ? 'w-full' : ''}`}
+                className={`rounded-lg border bg-white/5 px-2 py-2 flex flex-col gap-2 min-w-[160px] ${match.nextMatchId ? '' : 'border-amber-400'} ${roundNumber !== 1 ? 'w-full' : ''}`}
                 ref={cardRef}>
                 <div className="flex items-center justify-between">
                     {canEdit ? (

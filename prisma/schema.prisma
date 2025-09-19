@@ -161,6 +161,7 @@ model Duel {
   scoreB     Int?
   createdAt  DateTime  @default(now())
   finishedAt DateTime?
+  bestOf     Int       @default(1)
 
   playerA       Participant  @relation("DuelPlayerA", fields: [playerAId], references: [id], onDelete: Cascade)
   playerB       Participant  @relation("DuelPlayerB", fields: [playerBId], references: [id], onDelete: Cascade)

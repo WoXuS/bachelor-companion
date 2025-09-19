@@ -12,4 +12,5 @@ export type DuelDto = {
     playerA?: { id: string; name: string }
     playerB?: { id: string; name: string }
     winner?: { id: string; name: string } | null
+    bestOf: 1 | 3 | 5
 }

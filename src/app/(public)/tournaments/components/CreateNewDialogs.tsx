@@ -38,7 +38,7 @@ export function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTour
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button variant="secondary">+ Nowy</Button></DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[80vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Nowy turniej</DialogTitle></DialogHeader>
                 <div className="flex flex-col gap-3">
                     <Label>Typ turnieju</Label>
@@ -56,10 +56,15 @@ export function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTour
                     <Label>Nagroda główna</Label>
                     <Input type="number" value={Number.isNaN(mainPrize) ? '' : mainPrize}
                            onChange={(e) => setMainPrize(Number(e.target.value))} inputMode="numeric"/>
+                    {type === "SOLO" && (
+                        <>
+                            <Label>Nagroda drabinki przegranych</Label>
+                            <Input type="number" value={Number.isNaN(consolationPrize) ? '' : consolationPrize}
+                                   onChange={(e) => setConsolationPrize(Number(e.target.value))}
+                                   inputMode="numeric"/>
+                        </>
+                    )}
 
-                    <Label>Nagroda drabinki przegranych</Label>
-                    <Input type="number" value={Number.isNaN(consolationPrize) ? '' : consolationPrize}
-                           onChange={(e) => setConsolationPrize(Number(e.target.value))} inputMode="numeric"/>
 
                     {type === TournamentType.SOLO ? (
                         <>

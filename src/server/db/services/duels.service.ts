@@ -1,5 +1,5 @@
 import {prisma} from '../prisma'
-import {addTransaction} from './economy.service'
+import {addTransaction, transferBetween} from './economy.service'
 
 export async function createDuel(params: {
     title: string
@@ -30,9 +30,7 @@ export async function reportDuel(params: { id: string; winner: 'A' | 'B'; scoreA
             where: {id},
             data: {winnerId, scoreA: scoreA ?? null, scoreB: scoreB ?? null, finishedAt: new Date()},
         })
-
-        await addTransaction(winnerId, d.stake, `Wygrana 1v1: ${d.title}`, id)
-        await addTransaction(loserId, -d.stake, `Przegrana 1v1: ${d.title}`, id)
+        await transferBetween(loserId, winnerId, d.stake, `Wygrana 1v1 - ${d.title}`, `Przegrana 1v1 - ${d.title}`, id)
         return true
     })
 }
@@ -44,7 +42,7 @@ export async function revertDuel(id: string) {
         if (!d) throw new Error('Pojedynek nie znaleziony')
 
         const txs = await tx.transaction.findMany({
-            where: {matchId: id}, // używamy matchId również dla dueli – jest już w Transaction
+            where: {matchId: id},
             select: {participantId: true, amount: true},
         })
 
