@@ -14,14 +14,13 @@ const winsNeeded = (bestOf?: number) => Math.ceil((bestOf ?? 1) / 2)
 
 export function MatchCard({
                               match, tournament, canEdit, roundNumber,
-                              onReportAction, losersPlayInIds, hasWinnersPlayInRound0
+                              onReportAction, hasWinnersPlayInRound0
                           }: {
     match: TMatch
     tournament: TTournament
     canEdit: boolean
     roundNumber: number
     onReportAction: (w: 'A' | 'B', scoreA?: number, scoreB?: number) => void
-    losersPlayInIds?: Set<string>
     hasWinnersPlayInRound0?: boolean
 }) {
     const isSolo = tournament.type === 'SOLO'

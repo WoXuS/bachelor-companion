@@ -26,17 +26,6 @@ export function hasWinnersPlayIn(matches: TMatch[]): boolean {
     return r0.some(m => !!m.isBye)
 }
 
-export function losersPlayInSet(matches: TMatch[]): Set<string> {
-    const los = losersOnly(matches)
-    if (!los.length) return new Set()
-    const minRound = Math.min(...los.map(m => m.round))
-    const cntMin  = los.filter(m => m.round === minRound).length
-    const cntNext = los.filter(m => m.round === minRound + 1).length
-    const isL0 = cntNext > 0 && cntMin < cntNext
-    if (!isL0) return new Set()
-    return new Set(los.filter(m => m.round === minRound).map(m => m.id))
-}
-
 export function roundTitle(matches: TMatch[], bracket: BracketKind, roundIndex: number, totalColumns: number): string {
     const grouped = groupMatchesByRound(bracket === 'WINNERS' ? winnersOnly(matches) : losersOnly(matches))
     const column = grouped[roundIndex]

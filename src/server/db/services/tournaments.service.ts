@@ -184,16 +184,6 @@ export async function reportMatch(params: {
     )
 }
 
-
-export function updateTournamentBasics(id: string, data: {
-    title?: string;
-    mainPrize?: number;
-    matchWinPrize?: number;
-    consolationPrize?: number;
-}) {
-    return prisma.tournament.update({where: {id}, data})
-}
-
 type SeedPair = { A: string | null; B: string | null }
 
 function buildSingleElim(participantIds: string[]): SeedPair[][] {

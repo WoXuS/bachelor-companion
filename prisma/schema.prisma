@@ -22,6 +22,11 @@ model Participant {
   TournamentParticipants TournamentParticipant[]
 
   TournamentTeamMember TournamentTeamMember[]
+
+  duelsAsA Duel[] @relation("DuelPlayerA")
+  duelsAsB Duel[] @relation("DuelPlayerB")
+  duelsWon Duel[] @relation("DuelWinner")
+  Duel     Duel[]
 }
 
 model Transaction {
@@ -90,6 +95,7 @@ model TournamentTeam {
   id           String                 @id @default(cuid())
   tournamentId String
   name         String
+  createdAt    DateTime               @default(now())
   tournament   Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   members      TournamentTeamMember[]
 }
@@ -142,4 +148,25 @@ model Match {
   isBye    Boolean @default(false)
   bestOf   Int     @default(1)
   isPlayIn Boolean @default(false)
+}
+
+model Duel {
+  id         String    @id @default(cuid())
+  title      String
+  stake      Int
+  playerAId  String
+  playerBId  String
+  winnerId   String?
+  scoreA     Int?
+  scoreB     Int?
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  playerA       Participant  @relation("DuelPlayerA", fields: [playerAId], references: [id], onDelete: Cascade)
+  playerB       Participant  @relation("DuelPlayerB", fields: [playerBId], references: [id], onDelete: Cascade)
+  winner        Participant? @relation("DuelWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  Participant   Participant? @relation(fields: [participantId], references: [id])
+  participantId String?
+
+  @@index([createdAt])
 }

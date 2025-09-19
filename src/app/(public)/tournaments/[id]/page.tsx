@@ -14,7 +14,6 @@ import {
     groupMatchesByRound,
     roundTitle,
     hasWinnersPlayIn,
-    losersPlayInSet,
 } from './utils/bracketMeta'
 import {TMatch, TTournament} from "@/types/tournament";
 import {reseedRound1} from "@/server/db/services/tournaments.service";
@@ -79,7 +78,6 @@ export default function TournamentDetailPage() {
     }
 
     const hasR0 = hasWinnersPlayIn(tournament.matches)
-    const losersL0Ids = losersPlayInSet(tournament.matches)
 
     const winnersCols = groupMatchesByRound(winnersOnly(tournament.matches))
     const losersCols  = buildLosersDisplayColumns(tournament.matches)
@@ -158,7 +156,6 @@ export default function TournamentDetailPage() {
                                         tournament={tournament}
                                         canEdit={isAdmin}
                                         roundNumber={column[0]?.round}
-                                        losersPlayInIds={losersL0Ids}
                                         hasWinnersPlayInRound0={hasR0}
                                         onReportAction={(winner, scoreA, scoreB) =>
                                             reportMut.mutate({matchId: match.id, winner, scoreA, scoreB})
