@@ -7,51 +7,39 @@ export enum TournamentType {
     TEAM = 'TEAM',
 }
 
-export type TournamentDto = {
-    id: string
-    title: string
-    mainPrize: number
-    matchWinPrize: number
-    type: TournamentType
-}
+export type TParticipant = { id: string; name: string }
+export type TTeam = { id: string; name: string; members?: { participant: TParticipant }[] }
+export type TTP = { participantId: string; participant: TParticipant }
+export type BracketKind = 'WINNERS' | 'LOSERS' | 'GRAND_FINAL'
 
-export type MatchSummaryDto = {
+export type TMatch = {
     id: string
     round: number
     indexInRound: number
+    participantAId?: string | null
+    participantBId?: string | null
     winnerParticipantId?: string | null
+    teamAId?: string | null
+    teamBId?: string | null
     winnerTeamId?: string | null
+    nextMatchId?: string | null
+    nextMatchSlot?: string | null
+    scoreA?: number | null
+    scoreB?: number | null
+    isBye?: boolean
+    isPlayIn?: boolean;
+    bestOf: number
+    bracket?: BracketKind
 }
 
-export type TournamentListItemDto = TournamentDto & {
-    matches: MatchSummaryDto[]
-}
-
-export type TournamentParticipant = {
+export type TTournament = {
     id: string
-    tournamentId: string
-    participantId: string
-}
-
-export type CreateSoloTournamentPayload = {
-    type: TournamentType.SOLO
     title: string
+    type: TournamentType
     mainPrize: number
     matchWinPrize: number
-    participantIds: string[]
+    consolationPrize: number
+    participants: TTP[]
+    teams: TTeam[]
+    matches: TMatch[]
 }
-
-export type CreateTeamTournamentPayload = {
-    type: TournamentType.TEAM
-    title: string
-    mainPrize: number
-    matchWinPrize: number
-    teamA: { name: string; memberIds: string[] }
-    teamB: { name: string; memberIds: string[] }
-}
-
-export type CreateTournamentPayload =
-    | CreateSoloTournamentPayload
-    | CreateTeamTournamentPayload
-
-export type ApiError = { message: string }

@@ -18,6 +18,7 @@ import {
     TournamentType,
 } from '@/types/tournament'
 import {ParticipantDto} from "@/types/participant";
+import {CustomLoader} from "@/components/ui/CustomLoader";
 
 async function fetchTournaments(): Promise<TournamentListItemDto[]> {
     const res = await fetch('/api/tournaments')
@@ -48,7 +49,7 @@ export default function TournamentsPage() {
     const isAdmin = !!me?.isAdmin
 
 
-    const {data: rows = []} = useQuery<TournamentListItemDto[]>({
+    const {data: tournaments = [], isLoading} = useQuery<TournamentListItemDto[]>({
         queryKey: ['tournaments'],
         queryFn: fetchTournaments,
     })
@@ -62,15 +63,15 @@ export default function TournamentsPage() {
         onError: (e) => toast.error(e.message),
     })
 
+    if (isLoading) return <CustomLoader/>
     return (
         <div className="max-w-3xl mx-auto p-6 space-y-6 pt-20">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold">Turnieje</h1>
                 {isAdmin && <NewTournamentDialog onCreate={(p) => createMut.mutate(p)}/>}
             </div>
-
-            <ul className="space-y-3">
-                {rows.map((t) => {
+            {tournaments.length ? <ul className="space-y-3">
+                {tournaments.map((t) => {
                     const last = t.matches?.[0]
                     return (
                         <li key={t.id} className="flex items-center justify-between rounded-lg border p-3 bg-white/5">
@@ -90,7 +91,7 @@ export default function TournamentsPage() {
                         </li>
                     )
                 })}
-            </ul>
+            </ul> : <p className="text-destructive">Brak turniejów do wyświetlenia.</p>}
         </div>
     )
 }
@@ -100,6 +101,7 @@ function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentP
     const [type, setType] = useState<TournamentType>(TournamentType.SOLO)
     const [title, setTitle] = useState('')
     const [mainPrize, setMainPrize] = useState<number>(10)
+    const [consolationPrize, setConsolationPrize] = useState<number>(5)
     const [matchWinPrize, setMatchWinPrize] = useState<number>(2)
     const [teamA, setTeamA] = useState<{ name: string; memberIds: string[] }>({name: 'eryk huj', memberIds: []})
     const [teamB, setTeamB] = useState<{ name: string; memberIds: string[] }>({name: 'Kurwiorze', memberIds: []})
@@ -127,7 +129,7 @@ function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentP
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button>+ Nowy</Button></DialogTrigger>
+            <DialogTrigger asChild><Button variant="secondary">+ Nowy</Button></DialogTrigger>
             <DialogContent>
                 <DialogHeader><DialogTitle>Nowy turniej</DialogTitle></DialogHeader>
                 <div className="flex flex-col gap-3">
@@ -151,6 +153,15 @@ function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentP
                         inputMode="numeric"
                         id="mainPrize"
                     />
+                    <Label className="mt-3" htmlFor="consolationPrize">Nagroda drabinki przegranych</Label>
+                    <Input
+                        type="number"
+                        value={Number.isNaN(consolationPrize) ? '' : consolationPrize}
+                        onChange={(e) => setConsolationPrize(Number(e.target.value))}
+                        placeholder="Nagroda drabinki przegranych"
+                        inputMode="numeric"
+                        id="consolationPrize"
+                    />
 
                     {type === TournamentType.SOLO ? (
                         <>
@@ -170,6 +181,7 @@ function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentP
                                 value={participantIds}
                                 onValueChange={setParticipantIds}
                                 placeholder="Wybierz uczestników"
+                                className="bg-input/30 hover:bg-input/50"
                             />
                         </>
                     ) : (
@@ -194,6 +206,7 @@ function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentP
                                     })
                                 }
                                 placeholder="Skład Drużyny A"
+                                className="bg-input/30 hover:bg-input/50"
                             />
                             <Label className="mt-3" htmlFor="tournamentTeamBName">Nazwa Zespołu B</Label>
                             <Input
@@ -214,6 +227,7 @@ function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentP
                                     })
                                 }
                                 placeholder="Skład Drużyny B"
+                                className="bg-input/30 hover:bg-input/50"
                             />
                         </>
                     )}
@@ -230,6 +244,7 @@ function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentP
                                     title,
                                     mainPrize,
                                     matchWinPrize,
+                                    consolationPrize,
                                     participantIds,
                                 }
                                 onCreate(payload)
@@ -251,6 +266,7 @@ function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentP
                                 title,
                                 mainPrize,
                                 matchWinPrize,
+                                consolationPrize,
                                 teamA,
                                 teamB,
                             }

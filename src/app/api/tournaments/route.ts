@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server'
 import {listTournaments} from '@/server/db/repositories/tournaments.repo'
-import {createSoloTournament, createTeamTournament} from '@/server/db/services/tournaments.service'
+import {createSoloTournamentCompact, createTeamTournament} from '@/server/db/services/tournaments.service'
 
 export async function GET() {
     const rows = await listTournaments()
@@ -11,10 +11,11 @@ export async function POST(req: Request) {
     const body = await req.json()
     try {
         if (body.type === 'SOLO') {
-            const t = await createSoloTournament({
+            const t = await createSoloTournamentCompact({
                 title: body.title,
                 mainPrize: Number(body.mainPrize),
                 matchWinPrize: Number(body.matchWinPrize),
+                consolationPrize: Number(body.consolationPrize),
                 participantIds: body.participantIds,
             })
             return NextResponse.json(t)

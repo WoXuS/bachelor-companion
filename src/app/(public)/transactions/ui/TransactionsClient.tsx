@@ -237,7 +237,7 @@ function NewTransferDialog({participants}: { participants: ParticipantDto[] }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="flex-1">+ Nowa transakcja</Button>
+                <Button className="flex-1" variant="secondary">+ Nowa transakcja</Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader><DialogTitle>Wymiana $pruch Dollarów</DialogTitle></DialogHeader>

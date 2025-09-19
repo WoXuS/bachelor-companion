@@ -1,7 +1,7 @@
 import {prisma} from '../prisma'
 import {getShopItem} from '../repositories/shop.repo'
 
-export async function addTransaction(participantId: string, amount: number, reason: string) {
+export async function addTransaction(participantId: string, amount: number, reason: string, matchId?: string) {
     return prisma.$transaction(async (tx) => {
         const p = await tx.participant.findUnique({where: {id: participantId}, select: {balance: true}})
         if (!p) throw new Error('Participant not found')
@@ -9,7 +9,7 @@ export async function addTransaction(participantId: string, amount: number, reas
         const newBalance = p.balance + amount
 
         const created = await tx.transaction.create({
-            data: {participantId, amount, reason, balanceAfter: newBalance},
+            data: {participantId, amount, reason, balanceAfter: newBalance, matchId: matchId ?? null},
         })
 
         await tx.participant.update({

@@ -33,6 +33,7 @@ model Transaction {
   reason       String
   createdAt    DateTime @default(now())
   balanceAfter Int?
+  matchId      String?
 
   counterpartyId String?
   counterparty   Participant? @relation("TxCounterparty", fields: [counterpartyId], references: [id])
@@ -62,12 +63,13 @@ enum TournamentType {
 }
 
 model Tournament {
-  id            String         @id @default(cuid())
-  title         String
-  type          TournamentType
-  mainPrize     Int
-  matchWinPrize Int
-  createdAt     DateTime       @default(now())
+  id               String         @id @default(cuid())
+  title            String
+  type             TournamentType
+  mainPrize        Int
+  matchWinPrize    Int
+  consolationPrize Int            @default(0)
+  createdAt        DateTime       @default(now())
 
   participants TournamentParticipant[]
   teams        TournamentTeam[]
@@ -102,6 +104,12 @@ model TournamentTeamMember {
   @@unique([teamId, participantId])
 }
 
+enum BracketKind {
+  WINNERS
+  LOSERS
+  GRAND_FINAL
+}
+
 model Match {
   id           String     @id @default(cuid())
   tournamentId String
@@ -110,12 +118,10 @@ model Match {
   round        Int
   indexInRound Int
 
-  // SOLO:
   participantAId      String?
   participantBId      String?
   winnerParticipantId String?
 
-  // TEAM:
   teamAId      String?
   teamBId      String?
   winnerTeamId String?
@@ -123,10 +129,17 @@ model Match {
   scoreA Int?
   scoreB Int?
 
-  nextMatchId String?
-  nextMatch   Match?  @relation("NextMatch", fields: [nextMatchId], references: [id])
-
+  nextMatchId     String?
+  nextMatch       Match?  @relation("NextMatch", fields: [nextMatchId], references: [id])
   previousMatches Match[] @relation("NextMatch")
+  nextMatchSlot   String?
 
-  isBye Boolean @default(false)
+  bracket          BracketKind @default(WINNERS)
+  loserNextMatchId String?
+  loserNextMatch   Match?      @relation("LoserNext", fields: [loserNextMatchId], references: [id])
+  loserPrevious    Match[]     @relation("LoserNext")
+
+  isBye    Boolean @default(false)
+  bestOf   Int     @default(1)
+  isPlayIn Boolean @default(false)
 }

@@ -25,7 +25,7 @@ export function NavigationBar() {
     ]
 
     return (
-        <div className="relative">
+        < >
             <nav
                 className="fixed top-0 w-full flex bg-primary/80 shadow-primary-foreground shadow-[0_3px_15px_5px]">
                 {links.map((l, index, row) => (
@@ -37,7 +37,7 @@ export function NavigationBar() {
                 }
             </nav>
             <NavigationBarDialog links={links}/>
-        </div>
+        </>
     )
 }
 
