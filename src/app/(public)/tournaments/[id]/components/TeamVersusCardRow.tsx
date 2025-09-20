@@ -89,6 +89,7 @@ export default function TeamVersusCardRow({
             bestOf={(match.bestOf as 1 | 3 | 5) ?? 1}
             isBye={!!match.isBye}
             prize={prize}
+            isTeam={true}
             scoreA={match.scoreA ?? 0}
             scoreB={match.scoreB ?? 0}
             onReportAction={(w, a, b) => onReport(w, a, b)}

@@ -20,7 +20,6 @@ export function NavigationBar() {
         {href: '/ranking', icon: <Ranking size="32"/>, label: 'Ranking'},
         {href: '/transactions', icon: <ArrowRightLeft size="32"/>, label: 'Historia punktów'},
         {href: '/tournaments', icon: <Tournament size="32"/>, label: 'Turnieje'},
-        {href: '/rewards', icon: <Award size="32"/>, label: 'Nagrody'},
         {href: '/how-to-earn', icon: <BanknoteArrowUp size="32"/>, label: 'Jak zarabiać dollary'},
     ]
 

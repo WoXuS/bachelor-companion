@@ -10,7 +10,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {toast} from 'sonner'
 import {TTournament, TournamentType} from '@/types/tournament'
 import {ParticipantDto} from '@/types/participant'
-import {Cog} from "lucide-react";
+import {Cog, Trash2} from "lucide-react";
 
 async function fetchTournament(id: string): Promise<TTournament> {
     const r = await fetch(`/api/tournaments/${id}`)
@@ -38,7 +38,26 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
 
     const started = React.useMemo(() => {
         if (!t) return false
-        return t.matches.some(m => !!(m.winnerParticipantId || m.winnerTeamId || m.scoreA != null || m.scoreB != null))
+        return t.matches.some(m =>
+                !m.isBye && !!(
+                    m.winnerParticipantId ||
+                    m.winnerTeamId ||
+                    m.scoreA != null ||
+                    m.scoreB != null
+                )
+        )
+    }, [t])
+
+    const startedLosers = React.useMemo(() => {
+        if (!t) return false
+        return t.matches.some(m =>
+                !m.isPlayIn && m.bracket === 'LOSERS' && !!(
+                    m.winnerParticipantId ||
+                    m.winnerTeamId ||
+                    m.scoreA != null ||
+                    m.scoreB != null
+                )
+        )
     }, [t])
 
     const [title, setTitle] = React.useState('')
@@ -66,7 +85,6 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
             setTeamB({name: B?.name ?? '', memberIds: (B?.members ?? []).map(m => m.participant.id)})
         }
     }, [t])
-
     const opts = participants.map(p => ({value: p.id, label: p.name}))
     const optionsForTeamA = opts.filter(o => !teamB.memberIds.includes(o.value))
     const optionsForTeamB = opts.filter(o => !teamA.memberIds.includes(o.value))
@@ -118,46 +136,73 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
         onError: (e: any) => toast.error(e.message),
     })
 
+    const deleteMut = useMutation({
+        mutationFn: async () => {
+            const r = await fetch(`/api/tournaments/${tournamentId}`, {method: 'DELETE'})
+            const j = await r.json().catch(() => ({}))
+            if (!r.ok) throw new Error(j?.message || 'Delete failed')
+            return j
+        },
+        onSuccess: () => {
+            toast.success('Usunięto turniej i cofnięto jego transakcje')
+            setOpen(false)
+            qc.invalidateQueries()
+        },
+        onError: (e: any) => toast.error(e.message),
+    })
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button variant="secondary" size="sm"><Cog/></Button></DialogTrigger>
-            <DialogContent className="max-w-3xl">
+            <DialogTrigger asChild><Button variant="secondary" size="sm"
+                                           className="h-full rounded-none"><Cog/></Button></DialogTrigger>
+            <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Edycja turnieju</DialogTitle></DialogHeader>
                 {isLoading || !t ? <div className="py-10 text-center text-sm text-gray-400">Ładowanie…</div> : (
                     <div className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <Label>Tytuł</Label>
-                                <Input value={title} onChange={(e) => setTitle(e.target.value)}/>
-                            </div>
-                            <div>
-                                <Label>Nagroda główna</Label>
-                                <Input type="number" value={Number.isNaN(mainPrize) ? '' : mainPrize}
-                                       onChange={(e) => setMainPrize(Number(e.target.value))} inputMode="numeric"/>
-                            </div>
-                            <div>
-                                <Label>Nagroda za mecz</Label>
-                                <Input type="number" value={Number.isNaN(matchWinPrize) ? '' : matchWinPrize}
-                                       onChange={(e) => setMatchWinPrize(Number(e.target.value))}
-                                       inputMode="numeric" disabled={started}/>
-                            </div>
-                            <div>
-                                <Label>Nagroda drabinki przegranych</Label>
-                                <Input type="number" value={Number.isNaN(consolationPrize) ? '' : consolationPrize}
-                                       onChange={(e) => setConsolationPrize(Number(e.target.value))} inputMode="numeric"
-                                       disabled={started}/>
-                            </div>
+                            <Label>Tytuł</Label>
+                            <Input value={title} onChange={(e) => setTitle(e.target.value)}/>
+
+                            <Label>Nagroda główna</Label>
+                            <Input type="number" value={Number.isNaN(mainPrize) ? '' : mainPrize}
+                                   onChange={(e) => setMainPrize(Number(e.target.value))} inputMode="numeric"/>
+
+                            <Label>Nagroda za mecz</Label>
+                            <Input type="number" value={Number.isNaN(matchWinPrize) ? '' : matchWinPrize}
+                                   onChange={(e) => setMatchWinPrize(Number(e.target.value))}
+                                   inputMode="numeric" disabled={started}/>
+
+                            <Label>Nagroda drabinki przegranych</Label>
+                            <Input type="number" value={Number.isNaN(consolationPrize) ? '' : consolationPrize}
+                                   onChange={(e) => setConsolationPrize(Number(e.target.value))} inputMode="numeric"
+                                   disabled={startedLosers}/>
                         </div>
 
                         <div className="flex justify-end gap-2">
-                            <Button onClick={() => saveBasicsMut.mutate()} disabled={saveBasicsMut.isPending}>Zapisz
+                            <Button className="flex-2" onClick={() => saveBasicsMut.mutate()} disabled={saveBasicsMut.isPending}>Zapisz
                                 podstawy</Button>
+                            <Button
+                                className="flex-1"
+                                variant="destructive"
+                                onClick={() => {
+                                    if (
+                                        confirm(
+                                            'Na pewno? To cofnie wszystkie wypłaty powiązane z tym turniejem (o ile nikt nie spadnie poniżej 0) i usunie turniej.'
+                                        )
+                                    ) {
+                                        deleteMut.mutate()
+                                    }
+                                }}
+                                disabled={deleteMut.isPending}
+                            >
+                                <Trash2 size={24}/>
+                            </Button>
                         </div>
 
                         {t.type === TournamentType.SOLO ? (
                             <div className="space-y-2">
                                 <Label>Uczestnicy (tylko przed startem)</Label>
-                                <MultiSelect options={opts} value={participantIds} onValueChange={setParticipantIds}
+                                <MultiSelect options={opts} defaultValue={participantIds}
+                                             onValueChange={setParticipantIds} disabled={started}
                                              placeholder="Wybierz uczestników"
                                              className="bg-input/30 hover:bg-input/50"/>
                                 <div className="flex justify-end"><Button onClick={() => saveParticipantsMut.mutate()}
@@ -183,7 +228,7 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div>
                                         <Label>Skład A</Label>
-                                        <MultiSelect options={optionsForTeamA} value={teamA.memberIds}
+                                        <MultiSelect options={optionsForTeamA} defaultValue={teamA.memberIds}
                                                      onValueChange={(vals) => setTeamA({
                                                          ...teamA,
                                                          memberIds: dedupe(vals.filter(id => !teamB.memberIds.includes(id)))
@@ -192,7 +237,7 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
                                     </div>
                                     <div>
                                         <Label>Skład B</Label>
-                                        <MultiSelect options={optionsForTeamB} value={teamB.memberIds}
+                                        <MultiSelect options={optionsForTeamB} defaultValue={teamB.memberIds}
                                                      onValueChange={(vals) => setTeamB({
                                                          ...teamB,
                                                          memberIds: dedupe(vals.filter(id => !teamA.memberIds.includes(id)))

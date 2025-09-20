@@ -53,7 +53,7 @@ export function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTour
                     <Label>Tytuł</Label>
                     <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tytuł turnieju"/>
 
-                    <Label>Nagroda główna</Label>
+                    <Label>{type === "SOLO" ? 'Nagroda główna' : 'Nagroda na osobę'}</Label>
                     <Input type="number" value={Number.isNaN(mainPrize) ? '' : mainPrize}
                            onChange={(e) => setMainPrize(Number(e.target.value))} inputMode="numeric"/>
                     {type === "SOLO" && (

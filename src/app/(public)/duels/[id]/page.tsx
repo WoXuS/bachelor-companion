@@ -65,20 +65,8 @@ export default function DuelDetailPage() {
         onError: (e: any) => toast.error(e.message),
     })
 
-    if (isLoading || !duel) return <CustomLoader/>
-
-    const decided = !!duel.winnerId
-    const winnerSide: 'A' | 'B' | null =
-        duel.winnerId ? (duel.winnerId === duel.playerAId ? 'A' : 'B') : null
-
-    const nameA = duel.playerA?.name ?? '—'
-    const nameB = duel.playerB?.name ?? '—'
-
-    const prize = {amount: duel.stake, tone: 'normal' as const}
-
-
     const patchBestOf = async (bestOf: 1 | 3 | 5) => {
-        const res = await fetch(`/api/duels/${duel.id}`, {
+        const res = await fetch(`/api/duels/${id}`, {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({bestOf})
@@ -97,17 +85,22 @@ export default function DuelDetailPage() {
         onError: (e: any) => toast.error(e.message),
     })
 
+    if (isLoading || !duel) return <CustomLoader/>
+
+    const decided = !!duel.winnerId
+    const winnerSide: 'A' | 'B' | null =
+        duel.winnerId ? (duel.winnerId === duel.playerAId ? 'A' : 'B') : null
+
+    const nameA = duel.playerA?.name ?? '—'
+    const nameB = duel.playerB?.name ?? '—'
+
+    const prize = {amount: duel.stake, tone: 'normal' as const}
+
     return (
         <div className="max-w-3xl mx-auto pb-6 px-4 space-y-1 pt-20">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">1v1: {duel.title}</h1>
-                    <div className="text-sm text-gray-400">
-                        Stawka: {duel.stake} <span className="text-xs">$pruch</span> —{' '}
-                        <span className={decided ? 'text-emerald-400' : 'text-orange-400'}>
-              {decided ? `Wygrał: ${winnerSide === 'A' ? nameA : nameB}` : 'W toku'}
-            </span>
-                    </div>
                 </div>
             </div>
 

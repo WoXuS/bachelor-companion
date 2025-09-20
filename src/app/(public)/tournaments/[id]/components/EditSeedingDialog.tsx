@@ -153,7 +153,7 @@ export default function EditSeedingDialog({
             <DialogTrigger asChild>
                 <Button variant="secondary">Edycja rozstawienia (Runda 0)</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto [transform:none]">
+            <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto [transform:none]">
                 <DialogHeader>
                     <DialogTitle>
                         {r0Locked ? 'Runda 0 już rozpoczęta — edycja zablokowana' : 'Edycja rozstawienia (Round 0)'}

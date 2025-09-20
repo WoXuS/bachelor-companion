@@ -1,5 +1,5 @@
-import { TournamentType } from '@/types/tournament'
-import { TTournament, TMatch } from '@/types/tournament'
+import {TournamentType} from '@/types/tournament'
+import {TTournament, TMatch} from '@/types/tournament'
 
 export type TeamInput = { name: string; memberIds: string[] }
 
@@ -24,27 +24,27 @@ export type CreateTournamentPayload =
 
 export type ApiError = { message: string }
 
-export type TournamentListItemDto =
-    Pick<TTournament, 'id' | 'title' | 'type' | 'mainPrize' | 'matchWinPrize' | 'consolationPrize'> & {
-    matches?: Array<
-        Pick<
-            TMatch,
-            | 'id'
-            | 'round'
-            | 'indexInRound'
-            | 'bracket'
-            | 'participantAId'
-            | 'participantBId'
-            | 'winnerParticipantId'
-            | 'teamAId'
-            | 'teamBId'
-            | 'winnerTeamId'
-            | 'nextMatchId'
-            | 'scoreA'
-            | 'scoreB'
-            | 'isBye'
-            | 'isPlayIn'
-            | 'bestOf'
-        >
-    >
+export type TournamentListItemDto = {
+    id: string
+    title: string
+    type: 'SOLO' | 'TEAM'
+    mainPrize: number
+    matchWinPrize: number
+    consolationPrize: number
+    matches?: Array<{
+        id: string
+        round: number
+        indexInRound: number
+        bracket?: 'WINNERS' | 'LOSERS' | 'GRAND_FINAL' | null
+        nextMatchId?: string | null
+        participantAId?: string | null
+        participantBId?: string | null
+        winnerParticipantId?: string | null
+        teamAId?: string | null
+        teamBId?: string | null
+        winnerTeamId?: string | null
+        isBye: boolean
+    }>
+    participants: Array<{ participantId: string; participant: { id: string; name: string } }>
+    teams: Array<{ id: string; name: string }>
 }

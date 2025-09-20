@@ -107,7 +107,7 @@ export async function reportMatch(params: {
                         await addTransaction(
                             winnerParticipantId,
                             t.matchWinPrize,
-                            `Wygrana meczu (${m.bracket === 'WINNERS' ? 'drab. wygranych' : 'drab. przegranych'}) – ${t.title}`,
+                            `Wygrana meczu (${m.bracket === 'LOSERS' && 'drab. przegranych'}) – Turniej: ${t.title}`,
                             m.id
                         )
                     }
@@ -155,8 +155,7 @@ export async function reportMatch(params: {
                             const members = await tx.tournamentTeamMember.findMany({
                                 where: {teamId: final.winnerTeamId}, select: {participantId: true},
                             })
-                            const splits = splitInt(t.mainPrize, members.length)
-                            await Promise.all(members.map((m, i) => addTransaction(m.participantId, splits[i], `Wygrana turnieju: ${t.title}`)))
+                            await Promise.all(members.map((m, i) => addTransaction(m.participantId, t.mainPrize, `Wygrana turnieju: ${t.title}`, final.id)))
                         }
                     }
                 }

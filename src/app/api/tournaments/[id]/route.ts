@@ -33,6 +33,10 @@ export async function PUT(req: Request, { params }: Params) {
 }
 
 export async function DELETE(_: Request, { params }: Params) {
-    await deleteTournament(params.id)
-    return NextResponse.json({ ok: true })
+    try {
+        const res = await deleteTournament(params.id)
+        return NextResponse.json(res)
+    } catch (e: any) {
+        return NextResponse.json({ message: e.message ?? 'Delete failed' }, { status: 400 })
+    }
 }

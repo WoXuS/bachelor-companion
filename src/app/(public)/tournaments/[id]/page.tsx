@@ -85,109 +85,106 @@ export default function TournamentDetailPage() {
 
     const isSolo = tournament.type === TournamentType.SOLO
     const isTeam = tournament.type === TournamentType.TEAM
-
     return (
-        <div className="max-w-5xl mx-auto p-6 space-y-6 pt-20">
+        <div className={`max-w-5xl mx-auto pb-6 px-4 sm:px-6 ${isSolo ? 'space-y-6' : 'space-y-1'} pt-20`}>
             <header className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-2xl font-bold">Turniej: {tournament.title}</h1>
-
                 <div className="flex items-center gap-2 flex-wrap">
                     {isSolo && (
-
                         <Button onClick={() => setTab(tab === 'WINNERS' ? 'LOSERS' : 'WINNERS')}>
                             Pokaż drabinkę {tab === 'WINNERS' ? 'przegranych' : 'wygranych'}
                         </Button>
                     )}
                     {isAdmin && tab === 'LOSERS' && losersOnly(tournament.matches).length === 0 && (
                         <Button
-                        variant="secondary"
-                        onClick={() => {
-                        createConsolation(tournament.id)
-                        .then(() => {
-                        toast.success('Wygenerowano drabinkę przegranych')
-                        qc.invalidateQueries({queryKey: ['tournament', id]})
-                    })
-                        .catch((e) => toast.error(e.message))
-                    }}
-                >
-                    Generuj drabinkę przegranych
-                </Button>
-                )}
+                            variant="secondary"
+                            onClick={() => {
+                                createConsolation(tournament.id)
+                                    .then(() => {
+                                        toast.success('Wygenerowano drabinkę przegranych')
+                                        qc.invalidateQueries({queryKey: ['tournament', id]})
+                                    })
+                                    .catch((e) => toast.error(e.message))
+                            }}
+                        >
+                            Generuj drabinkę przegranych
+                        </Button>
+                    )}
 
-                {isAdmin && tab === 'WINNERS' && isSolo && (
-                <EditSeedingDialog
-                    tournament={tournament}
-                    onSaved={() => qc.invalidateQueries({queryKey: ['tournament', id]})}
-                    onReseed={() => {
-                        reseedRound1(id)
-                            .then(() => {
-                                toast.success('Przetasowano rozstawienie (R0)')
-                                qc.invalidateQueries({queryKey: ['tournament', id]})
-                            })
-                            .catch((e) => toast.error(e.message))
-                    }}
-                />
-                )}
-        </div>
-</header>
+                    {isAdmin && tab === 'WINNERS' && isSolo && (
+                        <EditSeedingDialog
+                            tournament={tournament}
+                            onSaved={() => qc.invalidateQueries({queryKey: ['tournament', id]})}
+                            onReseed={() => {
+                                reseedRound1(id)
+                                    .then(() => {
+                                        toast.success('Przetasowano rozstawienie (R0)')
+                                        qc.invalidateQueries({queryKey: ['tournament', id]})
+                                    })
+                                    .catch((e) => toast.error(e.message))
+                            }}
+                        />
+                    )}
+                </div>
+            </header>
 
-{
-    tab === 'LOSERS' && losersOnly(tournament.matches).length === 0 ? (
-        <>
-            <p>
-                <span className="text-destructive">Drabinka przegranych nie została jeszce wygenerowana.</span>
-                <br/>
-                <span className="text-orange-400">
+            {
+                tab === 'LOSERS' && losersOnly(tournament.matches).length === 0 ? (
+                    <>
+                        <p>
+                            <span
+                                className="text-destructive">Drabinka przegranych nie została jeszce wygenerowana.</span>
+                            <br/>
+                            <span className="text-orange-400">
               Wszystkie mecze rundy kwalifikacyjnej i rundy pierwszej muszą zostać ukończone.
             </span>
-            </p>
-            <p>
-                Drabinka przegranych jest budowana z przegranych rund kwalifikacyjnej oraz pierwszej. Jeżeli
-                liczba graczy
-                nie jest potęgą 2, zostanie rozegrany play-in (runda kwalifikacyjna drabinki przegranych).
-            </p>
-        </>
-    ) : (
-        <div className="overflow-auto">
-            <div className="flex gap-3 sm:gap-6 items-center">
-                {rounds.map((column, colIdx) => (
-                    <div key={colIdx} className="flex flex-col flex-1 gap-[12px]">
-                        <div className="font-semibold sm:text-base text-sm">
-                            {roundTitle(tournament.matches, tab, colIdx, rounds.length)}
+                        </p>
+                        <p>
+                            Drabinka przegranych jest budowana z przegranych rund kwalifikacyjnej oraz pierwszej. Jeżeli
+                            liczba graczy
+                            nie jest potęgą 2, zostanie rozegrany play-in (runda kwalifikacyjna drabinki przegranych).
+                        </p>
+                    </>
+                ) : (
+                    <div className={isSolo ? "overflow-auto" : ''}>
+                        <div className="flex gap-3 sm:gap-6 items-center">
+                            {rounds.map((column, colIdx) => (
+                                <div key={colIdx} className="flex flex-col flex-1 gap-[12px]">
+                                    {isSolo && <div className="font-semibold sm:text-base text-sm">
+                                        {roundTitle(tournament.matches, tab, colIdx, rounds.length)}
+                                    </div>}
+                                    {column.map((match: TMatch) =>
+                                        isSolo ? (
+                                            <MatchCard
+                                                key={match.id}
+                                                match={match}
+                                                tournament={tournament}
+                                                canEdit={isAdmin}
+                                                roundNumber={column[0]?.round}
+                                                hasWinnersPlayInRound0={hasR0}
+                                                onReportAction={(winner, scoreA, scoreB) =>
+                                                    reportMut.mutate({matchId: match.id, winner, scoreA, scoreB})
+                                                }
+                                            />
+                                        ) : (
+                                            <TeamVersusCardRow
+                                                key={match.id}
+                                                match={match}
+                                                tournament={tournament}
+                                                canEdit={isAdmin}
+                                                hasWinnersR0={hasR0}
+                                                onReport={(winner, scoreA, scoreB) =>
+                                                    reportMut.mutate({matchId: match.id, winner, scoreA, scoreB})
+                                                }
+                                            />
+                                        )
+                                    )}
+                                </div>
+                            ))}
                         </div>
-
-                        {column.map((match: TMatch) =>
-                            isSolo ? (
-                                <MatchCard
-                                    key={match.id}
-                                    match={match}
-                                    tournament={tournament}
-                                    canEdit={isAdmin}
-                                    roundNumber={column[0]?.round}
-                                    hasWinnersPlayInRound0={hasR0}
-                                    onReportAction={(winner, scoreA, scoreB) =>
-                                        reportMut.mutate({matchId: match.id, winner, scoreA, scoreB})
-                                    }
-                                />
-                            ) : (
-                                <TeamVersusCardRow
-                                    key={match.id}
-                                    match={match}
-                                    tournament={tournament}
-                                    canEdit={isAdmin}
-                                    hasWinnersR0={hasR0}
-                                    onReport={(winner, scoreA, scoreB) =>
-                                        reportMut.mutate({matchId: match.id, winner, scoreA, scoreB})
-                                    }
-                                />
-                            )
-                        )}
                     </div>
-                ))}
-            </div>
+                )
+            }
         </div>
     )
-}
-</div>
-)
 }

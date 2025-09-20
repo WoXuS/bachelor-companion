@@ -117,7 +117,6 @@ export function MatchCard({
         }
     })()
 
-
     const [cardHeight, setCardHeight] = React.useState<number>(0)
     const cardRef = React.useRef<HTMLDivElement>(null)
     React.useLayoutEffect(() => {

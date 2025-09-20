@@ -25,6 +25,7 @@ type Props = {
     bestOf?: BestOf
     isBye?: boolean
     prize?: PrizeBadge
+    isTeam?: boolean
 
     scoreA?: number | null
     scoreB?: number | null
@@ -39,7 +40,7 @@ export function VersusCard(props: Props) {
         sideALabel, sideBLabel, decided, winnerSide, canEdit,
         bestOf = 1, isBye = false, prize,
         scoreA: sA = 0, scoreB: sB = 0,
-        onChangeBestOfAction, onReportAction, onResetAction,
+        onChangeBestOfAction, onReportAction, onResetAction, isTeam
     } = props
 
     const [scoreA, setScoreA] = React.useState<number>(sA ?? 0)
@@ -79,7 +80,13 @@ export function VersusCard(props: Props) {
 
     return (
         <div className="flex flex-col gap-10 w-full">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400 flex flex-col gap-2">
+                <p>
+                    Stawka{isTeam && ' na osobę'}: {prize?.amount} <span className="text-xs">$pruch</span> —{' '}
+                    <span className={decided ? 'text-emerald-400' : 'text-orange-400'}>
+              {decided ? `Wygrał: ${winnerSide === 'A' ? sideALabel : sideBLabel}` : 'W toku'}
+            </span>
+                </p>
                 {!decided && canEdit && (
                     <div className="flex gap-2 items-center">
                         <p className="whitespace-nowrap">Pojedynek BEST OF</p>
@@ -117,9 +124,16 @@ export function VersusCard(props: Props) {
                             {winnerSide === 'A' &&
                                 <Crown className="absolute -top-6 -right-3 transform-[rotate(15deg)]" color="#EFBF04"
                                        size={26}/>}
-                            <p className={`text-xs ${winnerSide === 'B' ? 'text-destructive' : 'text-emerald-400'} ml-auto`}>
-                                {winnerSide === 'B' ? '-' : '+'}{prize?.amount} $pruch
-                            </p>
+                            {!isTeam &&
+                                <p className={`text-xs ${winnerSide === 'B' ? 'text-destructive' : 'text-emerald-400'} ml-auto`}>
+                                    {winnerSide === 'B' ? '-' : '+'}{prize?.amount} $pruch
+                                </p>
+                            }
+                            {isTeam && winnerSide === 'A' &&
+                                <p className='text-xs text-emerald-400 ml-auto'>
+                                    +{prize?.amount} $pruch
+                                </p>
+                            }
                         </>
                     )}
                     {winnerSide === 'A' && !isBye && onResetAction && canEdit && (
@@ -144,9 +158,16 @@ export function VersusCard(props: Props) {
                             {winnerSide === 'B' &&
                                 <Crown className="absolute -top-6 -right-3 transform-[rotate(15deg)]" color="#EFBF04"
                                        size={26}/>}
-                            <p className={`text-xs ${winnerSide === 'A' ? 'text-destructive' : 'text-emerald-400'} ml-auto`}>
-                                {winnerSide === 'A' ? '-' : '+'} {prize?.amount} $pruch
-                            </p>
+                            {!isTeam &&
+                                <p className={`text-xs ${winnerSide === 'B' ? 'text-emerald-400' : 'text-destructive'} ml-auto`}>
+                                    {winnerSide === 'B' ? '+' : '-'} {prize?.amount} $pruch
+                                </p>
+                            }
+                            {isTeam && winnerSide === 'B' &&
+                                <p className='text-xs text-emerald-400 ml-auto'>
+                                    +{prize?.amount} $pruch
+                                </p>
+                            }
                         </>
                     )}
                     {winnerSide === 'B' && onResetAction && canEdit && (
