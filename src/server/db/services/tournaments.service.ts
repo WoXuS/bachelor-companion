@@ -74,6 +74,24 @@ async function isWinnersPlayInMatch(
     return round === minR
 }
 
+async function getActiveDP(tx: Prisma.TransactionClient, participantId: string) {
+    return tx.participantBuff.findFirst({
+        where: { participantId, type: 'DOUBLE_POINTS', active: true, remainingMatches: { gt: 0 } },
+        orderBy: { createdAt: 'desc' },
+    })
+}
+
+async function decrementDPIfAny(tx: Prisma.TransactionClient, participantId: string) {
+    await tx.participantBuff.updateMany({
+        where: { participantId, type: 'DOUBLE_POINTS', active: true, remainingMatches: { gt: 0 } },
+        data: { remainingMatches: { decrement: 1 } },
+    })
+    await tx.participantBuff.updateMany({
+        where: { participantId, type: 'DOUBLE_POINTS', remainingMatches: 0, active: true },
+        data: { active: false },
+    })
+}
+
 export async function reportMatch(params: {
     matchId: string
     winner: 'A' | 'B'
@@ -104,11 +122,16 @@ export async function reportMatch(params: {
 
                     const shouldPayWinPrize = !(isPlayIn || isFinal)
                     if (shouldPayWinPrize) {
+                        let prize = t.matchWinPrize
+
+                        const dp = await getActiveDP(tx, winnerParticipantId)
+                        if (dp) prize *= 2
                         await addTransaction(
                             winnerParticipantId,
-                            t.matchWinPrize,
+                            prize,
                             `Wygrana meczu (${m.bracket === 'LOSERS' && 'drab. przegranych'}) – Turniej: ${t.title}`,
-                            m.id
+                            m.id,
+                            !!dp
                         )
                     }
                 }
@@ -178,6 +201,9 @@ export async function reportMatch(params: {
                     }
                 }
             }
+
+            if (m.participantAId) await decrementDPIfAny(tx, m.participantAId)
+            if (m.participantBId) await decrementDPIfAny(tx, m.participantBId)
             return true
         }
     )

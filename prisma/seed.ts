@@ -29,21 +29,24 @@ async function main() {
     )
 
     const items = [
-        {
-            key: 'immunity',
-            label: 'Immunitet (nikt Ci nie przeszkadza do końca mini-gry)',
-            cost: 8,
-            category: 'immunitet'
-        },
-        {key: 'give-shot', label: 'Każ komuś wypić szota', cost: 5, category: 'trolling'},
-        {
-            key: 'swimming-googles',
-            label: 'Wyznaczasz kogoś do chodzenia w okularach do pływania przez 10 minut',
-            cost: 6,
-            category: 'trolling'
-        },
-        {key: 'jump-lake', label: 'Wyznaczasz kogoś do skoku do jeziora', cost: 10, category: 'trolling'},
+        { key: 'give-shot',        label: 'Każ komuś wypić szota',                                   cost: 50,  category: 'trolling' },
+        { key: 'swimming-goggles', label: 'Okulary do pływania przez 10 minut',                       cost: 100, category: 'trolling' },
+        { key: 'jump-lake',        label: 'Zanurzenie głowy / skok do jeziora',                       cost: 150, category: 'trolling' },
+        { key: 'switch-opponent',  label: 'Zmiana przeciwnika w następnym meczu',                     cost: 100, category: 'trolling' },
+        { key: 'left-hand',        label: 'Lewa ręka – kara w następnym meczu',                       cost: 150, category: 'trolling' },
+        { key: 'freeze-casino',    label: 'Zamrożenie hazardu na 10 min',                             cost: 150, category: 'trolling' },
+
+        { key: 'immunity',         label: 'Immunitet (nikt Ci nie przeszkadza do końca mini-gry)',    cost: 150, category: 'buff' },
+        { key: 'double-points-4',  label: 'Double Points (4 kolejne mecze turniejowe)',               cost: 120, category: 'buff' },
     ]
+
+
+    await prisma.shopConfig.upsert({
+        where: { id: 'singleton' },
+        update: {},
+        create: { id: 'singleton', discountsEnabled: false, discountPercent: 20 },
+    })
+
     await Promise.all(
         items.map(item =>
             prisma.shopItem.upsert({
@@ -85,12 +88,12 @@ async function main() {
         )
     )
 
-    const groom = await prisma.participant.findFirst({ where: { name: 'Antoni' } })
+    const groom = await prisma.participant.findFirst({where: {name: 'Antoni'}})
     if (groom) {
         await prisma.$transaction(async (tx) => {
             const fresh = await tx.participant.findUnique({
-                where: { id: groom.id },
-                select: { balance: true },
+                where: {id: groom.id},
+                select: {balance: true},
             })
             const amount = 10
             const newBalance = (fresh?.balance ?? 0) + amount
@@ -104,8 +107,8 @@ async function main() {
                 },
             })
             await tx.participant.update({
-                where: { id: groom.id },
-                data: { balance: newBalance },
+                where: {id: groom.id},
+                data: {balance: newBalance},
             })
         })
     }

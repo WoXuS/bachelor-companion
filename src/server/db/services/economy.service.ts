@@ -2,7 +2,7 @@ import {prisma} from '../prisma'
 import {getShopItem} from '../repositories/shop.repo'
 import {string} from "zod";
 
-export async function addTransaction(participantId: string, amount: number, reason: string, matchId?: string) {
+export async function addTransaction(participantId: string, amount: number, reason: string, matchId?: string, doublePoints?: boolean) {
     return prisma.$transaction(async (tx) => {
         const p = await tx.participant.findUnique({where: {id: participantId}, select: {balance: true}})
         if (!p) throw new Error('Participant not found')
@@ -11,7 +11,7 @@ export async function addTransaction(participantId: string, amount: number, reas
         if (next < 0) throw new Error('Niewystarczające środki')
 
         const created = await tx.transaction.create({
-            data: {participantId, amount, reason, balanceAfter: next, matchId: matchId ?? null},
+            data: {participantId, amount, reason, balanceAfter: next, matchId: matchId ?? null, doublePoints: doublePoints ?? false},
         })
         await tx.participant.update({where: {id: participantId}, data: {balance: next}})
         return created

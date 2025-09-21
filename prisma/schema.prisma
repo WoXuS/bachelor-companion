@@ -23,10 +23,11 @@ model Participant {
 
   TournamentTeamMember TournamentTeamMember[]
 
-  duelsAsA Duel[] @relation("DuelPlayerA")
-  duelsAsB Duel[] @relation("DuelPlayerB")
-  duelsWon Duel[] @relation("DuelWinner")
-  Duel     Duel[]
+  duelsAsA        Duel[]           @relation("DuelPlayerA")
+  duelsAsB        Duel[]           @relation("DuelPlayerB")
+  duelsWon        Duel[]           @relation("DuelWinner")
+  Duel            Duel[]
+  participantBuff ParticipantBuff?
 }
 
 model Transaction {
@@ -42,6 +43,7 @@ model Transaction {
 
   counterpartyId String?
   counterparty   Participant? @relation("TxCounterparty", fields: [counterpartyId], references: [id])
+  doublePoints Boolean @default(false)
 }
 
 model Prize {
@@ -170,4 +172,26 @@ model Duel {
   participantId String?
 
   @@index([createdAt])
+}
+
+enum BuffType {
+  DOUBLE_POINTS
+}
+
+model ParticipantBuff {
+  id               String      @id @default(cuid())
+  participantId    String      @unique
+  participant      Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  type             BuffType
+  remainingMatches Int
+  active           Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+}
+
+model ShopConfig {
+  id               String   @id @default("singleton")
+  discountsEnabled Boolean  @default(false)
+  discountPercent  Int      @default(20) // -20% gdy enabled
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

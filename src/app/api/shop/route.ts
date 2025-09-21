@@ -1,10 +1,20 @@
 import {NextResponse} from 'next/server'
 import {prisma} from '@/server/db/prisma'
-import { listShopItems } from '@/server/db/repositories/shop.repo'
+import {
+    applyDiscountRound20,
+    getShopConfig
+} from "@/server/db/services/pricing.service";
 
 export async function GET() {
-    const items = await listShopItems()
-    return NextResponse.json(items)
+    const cfg = await getShopConfig()
+    const items = await prisma.shopItem.findMany({ orderBy: { label: 'asc' } })
+    const payload = items.map(i => ({
+        ...i,
+        effectiveCost: applyDiscountRound20(i.cost, cfg.discountsEnabled, cfg.discountPercent),
+        discountsEnabled: cfg.discountsEnabled,
+        discountPercent: cfg.discountPercent,
+    }))
+    return NextResponse.json(payload)
 }
 
 export async function POST(req: Request) {

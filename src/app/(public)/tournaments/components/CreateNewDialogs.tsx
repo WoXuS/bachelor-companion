@@ -21,9 +21,9 @@ export function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTour
     const [open, setOpen] = useState(false)
     const [type, setType] = useState<TournamentType>(TournamentType.SOLO)
     const [title, setTitle] = useState('')
-    const [mainPrize, setMainPrize] = useState<number>(10)
-    const [consolationPrize, setConsolationPrize] = useState<number>(5)
-    const [matchWinPrize, setMatchWinPrize] = useState<number>(2)
+    const [mainPrize, setMainPrize] = useState<number>(200)
+    const [consolationPrize, setConsolationPrize] = useState<number>(120)
+    const [matchWinPrize, setMatchWinPrize] = useState<number>(40)
     const [teamA, setTeamA] = useState<{ name: string; memberIds: string[] }>({name: '', memberIds: []})
     const [teamB, setTeamB] = useState<{ name: string; memberIds: string[] }>({name: '', memberIds: []})
     const [participantIds, setParticipantIds] = useState<string[]>([])
@@ -145,7 +145,7 @@ export function NewDuelDialog({onCreate}: {
 }) {
     const [open, setOpen] = useState(false)
     const [title, setTitle] = useState('')
-    const [stake, setStake] = useState<number>(5)
+    const [stake, setStake] = useState<number>(40)
     const [playerAId, setPlayerAId] = useState<string>('')
     const [playerBId, setPlayerBId] = useState<string>('')
 

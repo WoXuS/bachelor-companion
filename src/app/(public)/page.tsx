@@ -1,7 +1,7 @@
 'use client'
 
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
@@ -94,6 +94,23 @@ async function removeShopItem(id: string) {
     return res.json()
 }
 
+async function fetchShopConfig() {
+    const r = await fetch('/api/shop/config', {cache: 'no-store'})
+    if (!r.ok) throw new Error('Failed to load config')
+    return r.json()
+}
+
+async function updateShopConfig(patch: { discountsEnabled?: boolean; discountPercent?: number }) {
+    const r = await fetch('/api/shop/config', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(patch)
+    })
+    if (!r.ok) throw new Error('Failed to update config')
+    return r.json()
+}
+
+
 export default function HomePage() {
     const {data} = useQuery({queryKey: ['me'], queryFn: getAdmin})
     const isAdmin = !!data?.isAdmin
@@ -104,6 +121,12 @@ export default function HomePage() {
         enabled: isAdmin,
     })
     const qc = useQueryClient()
+
+    const {data: cfg} = useQuery({queryKey: ['shop-config'], queryFn: fetchShopConfig})
+    const updateCfg = useMutation({
+        mutationFn: updateShopConfig,
+        onSuccess: () => qc.invalidateQueries({queryKey: ['shop-config']}) || qc.invalidateQueries({queryKey: ['shop']})
+    })
 
     const mutation = useMutation({
         mutationFn: ({participantId, itemId}: { participantId: string; itemId: string }) =>
@@ -146,6 +169,24 @@ export default function HomePage() {
     return (
         <div className="max-w-2xl mx-auto p-6 space-y-6 pt-20">
             <h1 className="text-2xl font-bold mb-4">Cennik</h1>
+            {items[0] && (
+                <div className="mb-2 text-sm">
+                    {items[0].discountsEnabled &&
+                        <span className="rounded border px-2 py-1">Ceny -{items[0].discountPercent}%</span>}
+                </div>
+            )}
+            {isAdmin && cfg && (
+                <div className="mb-4 flex items-center gap-2">
+                    <Button
+                        size="sm"
+                        variant={cfg.discountsEnabled ? 'secondary' : 'default'}
+                        onClick={() => updateCfg.mutate({discountsEnabled: !cfg.discountsEnabled})}
+                    >
+                        {cfg.discountsEnabled ? 'Wyłącz zniżki' : 'Włącz zniżki (-20%)'}
+                    </Button>
+                    <AdminShopControls/>
+                </div>
+            )}
             <ul className="space-y-3">
                 {items.map((item) => (
                     <li
@@ -154,7 +195,13 @@ export default function HomePage() {
                     >
                         <div className="flex flex-col gap-2">
                             <div className="font-medium text-sm">{item.label}</div>
-                            <div className="text-sm text-gray-400">{item.cost} $pruch</div>
+                            <div className="text-sm text-gray-400">
+                                {('effectiveCost' in item ? (item as any).effectiveCost : item.cost)} $pruch
+                                {('effectiveCost' in item && (item as any).effectiveCost !== item.cost) && (
+                                    <s className="ml-2 text-xs text-gray-500">(bazowo {item.cost})</s>
+                                )}
+                            </div>
+
                         </div>
                         {isAdmin && (
                             <div className="flex gap-1">
@@ -182,9 +229,7 @@ export default function HomePage() {
                 Zbierasz <span className="text-primary">$pruch Dollary</span> wykonując różne czynności.<br/>
                 Możesz wydawać <span className="text-primary">$pruch Dollary</span> na przedmioty z cennika.<br/>
                 Osoby z największą liczbą <span className="text-primary">$pruch Dollarów</span> na koniec wyjazdu
-                wygrywają <Button asChild variant="link" size="icon">
-                <Link href="/prizes">nagrody</Link>
-            </Button>.
+                wygrywają nagrody.
             </p>
             <h1 className="text-lg font-bold mb-4">Po co wydawać <span className="text-primary">$pruch Dollary</span> na
                 rzeczy z cennika?</h1>
@@ -331,8 +376,8 @@ function AddEditItemDialog({
                             <SelectItem value='trolling'>
                                 Trolling
                             </SelectItem>
-                            <SelectItem value='immunitet'>
-                                Immunitet
+                            <SelectItem value='buff'>
+                                Buff
                             </SelectItem>
                         </SelectContent>
                     </Select>
@@ -368,5 +413,66 @@ function AddEditItemDialog({
                 </div>
             </DialogContent>
         </Dialog>
+    )
+}
+
+function AdminShopControls() {
+    const qc = useQueryClient()
+    const {data: cfg} = useQuery({queryKey: ['shop-config'], queryFn: fetchShopConfig})
+    const [localPercent, setLocalPercent] = useState<number>(20)
+
+    useEffect(() => {
+        if (typeof cfg?.discountPercent === 'number') setLocalPercent(cfg.discountPercent)
+    }, [cfg?.discountPercent])
+
+    const mutateCfg = useMutation({
+        mutationFn: updateShopConfig,
+        onSuccess: () => {
+            qc.invalidateQueries({queryKey: ['shop-config']})
+            qc.invalidateQueries({queryKey: ['shop']})
+            toast.success('Zapisano ustawienia sklepu')
+        },
+        onError: (e: any) => toast.error(e?.message ?? 'Błąd zapisu'),
+    })
+
+    const toggle = () => {
+        if (!cfg) return
+        mutateCfg.mutate({discountsEnabled: !cfg.discountsEnabled})
+    }
+
+    const savePercent = () => {
+        const val = Math.max(0, Math.min(80, Math.round(localPercent))) // clamp 0..80
+        mutateCfg.mutate({discountPercent: val})
+    }
+
+    return (
+        <div className="mb-4 rounded-lg border p-3 bg-white/5 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+                <div className="text-sm">
+                    {cfg?.discountsEnabled ? `Ceny aktywne: -${cfg.discountPercent}%` : 'Ceny standardowe'}
+                </div>
+                <Button size="sm" variant={cfg?.discountsEnabled ? 'secondary' : 'default'} onClick={toggle}>
+                    {cfg?.discountsEnabled ? 'Wyłącz zniżki' : 'Włącz zniżki'}
+                </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+                <Input
+                    type="number"
+                    value={localPercent}
+                    onChange={(e) => setLocalPercent(Number(e.target.value))}
+                    className="w-24"
+                    min={0}
+                    max={80}
+                    step={5}
+                />
+                <span className="text-sm text-gray-400">% zniżki (0–80)</span>
+                <Button size="sm" onClick={savePercent}>Zapisz %</Button>
+            </div>
+
+            <div className="text-xs text-gray-500">
+                Zniżka liczy się na backendzie i zaokrąglana jest do najbliższej 20.
+            </div>
+        </div>
     )
 }
