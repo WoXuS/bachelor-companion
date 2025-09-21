@@ -1,4 +1,4 @@
-import { Participant } from '@prisma/client'
+import {Participant} from '@prisma/client'
 
 export type ParticipantDb = Participant
 
@@ -7,4 +7,17 @@ export type ParticipantDto = {
     name: string
     avatarUrl: string | null
     balance: number
+    buffs: ParticipantBuff[]
+}
+
+type ParticipantBuff = {
+    id: string
+    participantId: string
+    remainingMatches: number
+    active: boolean
+    type: BuffType
+}
+
+export enum BuffType {
+    DOUBLE_POINTS
 }

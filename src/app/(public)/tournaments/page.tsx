@@ -77,7 +77,6 @@ export default function TournamentsPage() {
     })
 
     if (tLoading || dLoading) return <CustomLoader/>
-    console.log(tournaments)
     return (
         <div className="max-w-4xl mx-auto p-6 space-y-6 pt-20">
             <div className="flex items-center justify-between">

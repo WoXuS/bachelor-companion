@@ -2,6 +2,7 @@ import {prisma} from '../prisma'
 import {addTransaction} from './economy.service'
 import {Prisma, TournamentTeamMember} from '@prisma/client'
 import {NextResponse} from "next/server";
+import {TMatch} from "@/types/tournament";
 
 function shuffle<T>(arr: T[]) {
     return arr
@@ -9,13 +10,6 @@ function shuffle<T>(arr: T[]) {
         .sort((a, b) => a[0] - b[0])
         .map(([, v]) => v)
 }
-
-function splitInt(total: number, n: number) {
-    const base = Math.floor(total / n)
-    const rem = total % n
-    return Array.from({length: n}, (_, i) => base + (i < rem ? 1 : 0))
-}
-
 
 export async function createTeamTournament(params: {
     title: string
@@ -52,161 +46,206 @@ async function getTeamMemberIds(tx: any, teamId: string): Promise<string[]> {
     return members.map((m: TournamentTeamMember) => m.participantId)
 }
 
-async function isWinnersPlayInMatch(
-    tx: Prisma.TransactionClient,
-    tournamentId: string,
-    round: number
-): Promise<boolean> {
-    const minRoundRow = await tx.match.findFirst({
-        where: {tournamentId, bracket: 'WINNERS'},
-        orderBy: {round: 'asc'},
-        select: {round: true},
-    })
-    if (!minRoundRow) return false
+type Tx = Prisma.TransactionClient
 
-    const minR = minRoundRow.round
-    const anyByeInMin = await tx.match.count({
-        where: {tournamentId, bracket: 'WINNERS', round: minR, isBye: true},
-    })
-
-    if (anyByeInMin === 0) return false
-
-    return round === minR
+const BRACKET_LABEL: Record<'WINNERS'|'LOSERS'|'GRAND_FINAL', string> = {
+    WINNERS: 'drab. wygranych',
+    LOSERS: 'drab. przegranych',
+    GRAND_FINAL: 'wygrana turnieju',
 }
 
-async function getActiveDP(tx: Prisma.TransactionClient, participantId: string) {
+async function getActiveDP(tx: Tx, participantId: string) {
     return tx.participantBuff.findFirst({
         where: { participantId, type: 'DOUBLE_POINTS', active: true, remainingMatches: { gt: 0 } },
         orderBy: { createdAt: 'desc' },
     })
 }
 
-async function decrementDPIfAny(tx: Prisma.TransactionClient, participantId: string) {
-    await tx.participantBuff.updateMany({
+async function decrementDPIfAny(tx: Tx, participantId: string, matchId: string) {
+    const updated = await tx.participantBuff.updateMany({
         where: { participantId, type: 'DOUBLE_POINTS', active: true, remainingMatches: { gt: 0 } },
         data: { remainingMatches: { decrement: 1 } },
     })
-    await tx.participantBuff.updateMany({
-        where: { participantId, type: 'DOUBLE_POINTS', remainingMatches: 0, active: true },
-        data: { active: false },
-    })
+    if (updated.count > 0) {
+        await tx.participantBuff.updateMany({
+            where: { participantId, type: 'DOUBLE_POINTS', remainingMatches: 0, active: true },
+            data: { active: false },
+        })
+        await tx.participantBuffUsage.create({
+            data: { participantId, matchId, used: 1 },
+        })
+    }
 }
 
-export async function reportMatch(params: {
-    matchId: string
-    winner: 'A' | 'B'
-    scoreA?: number
-    scoreB?: number
-}) {
+async function isWinnersPlayInMatch(tx: Tx, tournamentId: string, round: number): Promise<boolean> {
+    const minRoundRow = await tx.match.findFirst({
+        where: { tournamentId, bracket: 'WINNERS' },
+        orderBy: { round: 'asc' },
+        select: { round: true },
+    })
+    if (!minRoundRow) return false
+    const minR = minRoundRow.round
+    const anyByeInMin = await tx.match.count({
+        where: { tournamentId, bracket: 'WINNERS', round: minR, isBye: true },
+    })
+    if (anyByeInMin === 0) return false
+    return round === minR
+}
+
+async function isPlayInMatch(tx: Tx, m: TMatch): Promise<boolean> {
+    if (m.bracket === 'LOSERS') return !!m.isPlayIn
+    return await isWinnersPlayInMatch(tx, m.tournamentId, m.round)
+}
+
+async function teamMemberIds(tx: Tx, teamId: string): Promise<string[]> {
+    const members = await tx.tournamentTeamMember.findMany({
+        where: { teamId },
+        select: { participantId: true },
+    })
+    return members.map(m => m.participantId)
+}
+
+function isSoloMatch(m: { participantAId: string|null, participantBId: string|null }): boolean {
+    return !!(m.participantAId || m.participantBId)
+}
+
+async function winnerParticipantIds(tx: Tx, m: any, winner: 'A'|'B'): Promise<string[]> {
+    if (isSoloMatch(m)) {
+        const pid = winner === 'A' ? m.participantAId : m.participantBId
+        if (!pid) throw new Error('Brak uczestnika po wybranej stronie')
+        return [pid]
+    } else {
+        const tid = winner === 'A' ? m.teamAId : m.teamBId
+        if (!tid) throw new Error('Brak zespołu po wybranej stronie')
+        return teamMemberIds(tx, tid)
+    }
+}
+
+async function setMatchWinner(tx: Tx, m: any, winner: 'A'|'B', scoreA?: number, scoreB?: number) {
+    const base = { scoreA: scoreA ?? null, scoreB: scoreB ?? null }
+    if (isSoloMatch(m)) {
+        const winnerParticipantId = winner === 'A' ? m.participantAId : m.participantBId
+        if (!winnerParticipantId) throw new Error('Brak uczestnika po wybranej stronie')
+        await tx.match.update({ where: { id: m.id }, data: { ...base, winnerParticipantId } })
+        return { winnerParticipantId, winnerTeamId: null as null }
+    } else {
+        const winnerTeamId = winner === 'A' ? m.teamAId : m.teamBId
+        if (!winnerTeamId) throw new Error('Brak zespołu po wybranej stronie')
+        await tx.match.update({ where: { id: m.id }, data: { ...base, winnerTeamId } })
+        return { winnerParticipantId: null as null, winnerTeamId }
+    }
+}
+
+async function advanceWinner(tx: Tx, m: any, winner: 'A'|'B') {
+    if (!m.nextMatchId || !m.nextMatchSlot) return
+    if (isSoloMatch(m)) {
+        const pid = winner === 'A' ? m.participantAId : m.participantBId
+        if (!pid) return
+        await tx.match.update({
+            where: { id: m.nextMatchId },
+            data: m.nextMatchSlot === 'A' ? { participantAId: pid } : { participantBId: pid },
+        })
+    } else {
+        const tid = winner === 'A' ? m.teamAId : m.teamBId
+        if (!tid) return
+        await tx.match.update({
+            where: { id: m.nextMatchId },
+            data: m.nextMatchSlot === 'A' ? { teamAId: tid } : { teamBId: tid },
+        })
+    }
+}
+
+async function payWithDP(tx: Tx, participantId: string, baseAmount: number, description: string, matchId: string) {
+    let amount = baseAmount
+    const dp = await getActiveDP(tx, participantId)
+    const doubled = !!dp
+    if (doubled) amount *= 2
+    await addTransaction(participantId, amount, description, matchId, doubled)
+}
+
+async function payMany(tx: Tx, participantIds: string[], baseAmount: number, description: string, matchId: string) {
+    for (const pid of participantIds) {
+        await payWithDP(tx, pid, baseAmount, description, matchId)
+    }
+}
+
+async function shouldPayWinPrize(tx: Tx, m: any): Promise<boolean> {
+    const isFinal = !m.nextMatchId
+    const isPlayIn = m.bracket === 'LOSERS' ? !!m.isPlayIn : await isWinnersPlayInMatch(tx, m.tournamentId, m.round)
+    return !(isFinal || isPlayIn)
+}
+
+async function maybePayoutClosedBracket(tx: Tx, t: any, bracket: 'WINNERS'|'LOSERS') {
+    const open = await tx.match.count({
+        where: { tournamentId: t.id, bracket, winnerParticipantId: null, winnerTeamId: null },
+    })
+    if (open > 0) return
+
+    const prize = bracket === 'WINNERS' ? t.mainPrize : t.consolationPrize
+    if (!prize || prize <= 0) return
+
+    const final = await tx.match.findFirst({
+        where: {
+            tournamentId: t.id,
+            bracket,
+            ...(t.type === 'SOLO' ? { winnerParticipantId: { not: null } } : { winnerTeamId: { not: null } }),
+        },
+        orderBy: [{ round: 'desc' }, { indexInRound: 'asc' }],
+    })
+    if (!final) return
+
+    if (t.type === 'SOLO' && final.winnerParticipantId) {
+        await payWithDP(tx, final.winnerParticipantId, prize, `Wygrana ${bracket === 'WINNERS' ? 'turnieju' : BRACKET_LABEL[bracket]}, turniej: ${t.title}`, final.id)
+    } else if (t.type !== 'SOLO' && final.winnerTeamId) {
+        const members = await teamMemberIds(tx, final.winnerTeamId)
+        await payMany(tx, members, prize, `Wygrana ${bracket === 'WINNERS' ? 'turnieju' : BRACKET_LABEL[bracket]}, turniej: ${t.title}`, final.id)
+    }
+}
+
+async function participantsWhoPlayed(tx: Tx, m: any): Promise<string[]> {
+    if (isSoloMatch(m)) {
+        return [m.participantAId, m.participantBId].filter(Boolean) as string[]
+    }
+    const ids: string[] = []
+    if (m.teamAId) ids.push(...await teamMemberIds(tx, m.teamAId))
+    if (m.teamBId) ids.push(...await teamMemberIds(tx, m.teamBId))
+    return ids
+}
+
+export async function reportMatch(params: { matchId: string; winner: 'A'|'B'; scoreA?: number; scoreB?: number }) {
     return prisma.$transaction(async (tx) => {
-            const m = await tx.match.findUnique({where: {id: params.matchId}})
-            if (!m) throw new Error('Mecz nie znaleziony')
+        const m = await tx.match.findUnique({ where: { id: params.matchId } })
+        if (!m) throw new Error('Mecz nie znaleziony')
 
-            const t = await tx.tournament.findUnique({where: {id: m.tournamentId}})
-            if (!t) throw new Error('Turniej nie znaleziony')
+        const t = await tx.tournament.findUnique({ where: { id: m.tournamentId } })
+        if (!t) throw new Error('Turniej nie znaleziony')
 
-            const isSolo = !!(m.participantAId || m.participantBId)
+        const playIn = await isPlayInMatch(tx, m)
 
-            if (isSolo) {
-                const winnerParticipantId = params.winner === 'A' ? m.participantAId : m.participantBId
-                if (!winnerParticipantId) throw new Error('Brak uczestnika po wybranej stronie')
+        const { winnerParticipantId, winnerTeamId } = await setMatchWinner(tx, m, params.winner, params.scoreA, params.scoreB)
+        await advanceWinner(tx, m, params.winner)
 
-                await tx.match.update({
-                    where: {id: m.id},
-                    data: {winnerParticipantId, scoreA: params.scoreA ?? null, scoreB: params.scoreB ?? null},
-                })
-                if (t.matchWinPrize > 0) {
-                    const isFinal = !m.nextMatchId
-                    const isPlayIn = m.bracket === 'LOSERS' ? !!m.isPlayIn
-                        : (await isWinnersPlayInMatch(tx, m.tournamentId, m.round))
-
-                    const shouldPayWinPrize = !(isPlayIn || isFinal)
-                    if (shouldPayWinPrize) {
-                        let prize = t.matchWinPrize
-
-                        const dp = await getActiveDP(tx, winnerParticipantId)
-                        if (dp) prize *= 2
-                        await addTransaction(
-                            winnerParticipantId,
-                            prize,
-                            `Wygrana meczu (${m.bracket === 'LOSERS' && 'drab. przegranych'}) – Turniej: ${t.title}`,
-                            m.id,
-                            !!dp
-                        )
-                    }
-                }
-
-                if (m.nextMatchId && m.nextMatchSlot) {
-                    await tx.match.update({
-                        where: {id: m.nextMatchId},
-                        data: m.nextMatchSlot === 'A' ? {participantAId: winnerParticipantId} : {participantBId: winnerParticipantId},
-                    })
-                }
-            } else {
-                const winnerTeamId = params.winner === 'A' ? m.teamAId : m.teamBId
-                if (!winnerTeamId) throw new Error('Brak zespołu po wybranej stronie')
-                await tx.match.update({
-                    where: {id: m.id},
-                    data: {winnerTeamId, scoreA: params.scoreA ?? null, scoreB: params.scoreB ?? null},
-                })
-            }
-
-            if (m.bracket === 'WINNERS') {
-                const openWinners = await tx.match.count({
-                    where: {
-                        tournamentId: m.tournamentId,
-                        bracket: 'WINNERS',
-                        winnerParticipantId: null,
-                        winnerTeamId: null
-                    },
-                })
-                if (openWinners === 0) {
-                    if (t.type === 'SOLO') {
-                        const final = await tx.match.findFirst({
-                            where: {tournamentId: t.id, bracket: 'WINNERS', winnerParticipantId: {not: null}},
-                            orderBy: [{round: 'desc'}, {indexInRound: 'asc'}],
-                        })
-                        if (final?.winnerParticipantId) {
-                            await addTransaction(final.winnerParticipantId, t.mainPrize, `Wygrana turnieju: ${t.title}`, final.id)
-                        }
-                    } else {
-                        const final = await tx.match.findFirst({
-                            where: {tournamentId: t.id, bracket: 'WINNERS', winnerTeamId: {not: null}},
-                            orderBy: [{round: 'desc'}, {indexInRound: 'asc'}],
-                        })
-                        if (final?.winnerTeamId) {
-                            const members = await tx.tournamentTeamMember.findMany({
-                                where: {teamId: final.winnerTeamId}, select: {participantId: true},
-                            })
-                            await Promise.all(members.map((m, i) => addTransaction(m.participantId, t.mainPrize, `Wygrana turnieju: ${t.title}`, final.id)))
-                        }
-                    }
-                }
-            } else if (m.bracket === 'LOSERS' && t.type === 'SOLO') {
-                const openLosers = await tx.match.count({
-                    where: {tournamentId: m.tournamentId, bracket: 'LOSERS', winnerParticipantId: null},
-                })
-                if (openLosers === 0 && t.consolationPrize > 0) {
-                    const final = await tx.match.findFirst({
-                        where: {tournamentId: t.id, bracket: 'LOSERS', winnerParticipantId: {not: null}},
-                        orderBy: [{round: 'desc'}, {indexInRound: 'asc'}],
-                    })
-                    if (final?.winnerParticipantId) {
-                        await addTransaction(
-                            final.winnerParticipantId,
-                            t.consolationPrize,
-                            `Wygrana drabinki przegranych, turniej: ${t.title}`,
-                            final.id
-                        )
-                    }
-                }
-            }
-
-            if (m.participantAId) await decrementDPIfAny(tx, m.participantAId)
-            if (m.participantBId) await decrementDPIfAny(tx, m.participantBId)
-            return true
+        if (!playIn && t.matchWinPrize > 0 && await shouldPayWinPrize(tx, m)) {
+            const winners = await winnerParticipantIds(tx, m, params.winner)
+            const label = isSoloMatch(m)
+                ? `Wygrana meczu (${BRACKET_LABEL[m.bracket]}) – Turniej: ${t.title}`
+                : `Wygrana meczu drużynowego – Turniej: ${t.title}`
+            await payMany(tx, winners, t.matchWinPrize, label, m.id)
         }
-    )
+
+        if (m.bracket === 'WINNERS') {
+            await maybePayoutClosedBracket(tx, t, 'WINNERS')
+        } else {
+            await maybePayoutClosedBracket(tx, t, 'LOSERS')
+        }
+
+        if (!playIn) {
+            const played = await participantsWhoPlayed(tx, m)
+            for (const pid of played) await decrementDPIfAny(tx, pid, m.id)
+        }
+
+        return true
+    })
 }
 
 type SeedPair = { A: string | null; B: string | null }

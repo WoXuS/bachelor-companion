@@ -23,11 +23,12 @@ model Participant {
 
   TournamentTeamMember TournamentTeamMember[]
 
-  duelsAsA        Duel[]           @relation("DuelPlayerA")
-  duelsAsB        Duel[]           @relation("DuelPlayerB")
-  duelsWon        Duel[]           @relation("DuelWinner")
-  Duel            Duel[]
-  participantBuff ParticipantBuff?
+  duelsAsA               Duel[]               @relation("DuelPlayerA")
+  duelsAsB               Duel[]               @relation("DuelPlayerB")
+  duelsWon               Duel[]               @relation("DuelWinner")
+  Duel                   Duel[]
+  buffs                  ParticipantBuff[]
+  buffUsage              ParticipantBuffUsage[]
 }
 
 model Transaction {
@@ -43,7 +44,7 @@ model Transaction {
 
   counterpartyId String?
   counterparty   Participant? @relation("TxCounterparty", fields: [counterpartyId], references: [id])
-  doublePoints Boolean @default(false)
+  isDoubled      Boolean      @default(false)
 }
 
 model Prize {
@@ -188,10 +189,24 @@ model ParticipantBuff {
   createdAt        DateTime    @default(now())
 }
 
+model ParticipantBuffUsage {
+  id            String @id @default(cuid())
+  participantId String
+  matchId       String
+  used          Int
+
+  createdAt DateTime @default(now())
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([participantId])
+}
+
 model ShopConfig {
   id               String   @id @default("singleton")
   discountsEnabled Boolean  @default(false)
-  discountPercent  Int      @default(20) // -20% gdy enabled
+  discountPercent  Int      @default(20)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }

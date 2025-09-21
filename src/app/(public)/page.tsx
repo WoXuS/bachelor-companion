@@ -17,7 +17,7 @@ import {Cog} from "lucide-react"
 /** ---------- Types & helpers ---------- */
 
 type ShopItemView = ShopItemDto & {
-    effectiveCost?: number // returned by /api/shop
+    effectiveCost?: number
 }
 
 type ShopConfig = {

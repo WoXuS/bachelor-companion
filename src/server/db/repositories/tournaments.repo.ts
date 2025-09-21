@@ -1,12 +1,13 @@
 import {prisma} from '../prisma'
+import {BracketKind, TournamentType, TTournament} from "@/types/tournament";
 
 export function listTournaments() {
     return prisma.tournament.findMany({
-        orderBy: { createdAt: 'desc' },
+        orderBy: {createdAt: 'desc'},
         include: {
             matches: {
-                where: { bracket: 'WINNERS', round: { gt: 0 } },
-                orderBy: [{ round: 'asc' }, { indexInRound: 'asc' }],
+                where: {bracket: 'WINNERS', round: {gt: 0}},
+                orderBy: [{round: 'asc'}, {indexInRound: 'asc'}],
                 select: {
                     id: true,
                     round: true,
@@ -22,38 +23,142 @@ export function listTournaments() {
                 },
             },
             participants: {
-                select: { participantId: true, participant: { select: { id: true, name: true } } },
+                select: {participantId: true, participant: {select: {id: true, name: true}}},
             },
-            teams: { select: { id: true, name: true } },
+            teams: {select: {id: true, name: true}},
         },
     })
 }
 
 
-export function getTournament(id: string) {
-    return prisma.tournament.findUnique({
-        where: {id},
+export async function getTournament(id: string): Promise<TTournament | null> {
+    const t = await prisma.tournament.findUnique({
+        where: { id },
         include: {
-            participants: {include: {participant: true}},
-            teams: {include: {members: {include: {participant: true}}}},
+            participants: {
+                include: {
+                    participant: {
+                        select: {
+                            id: true,
+                            name: true,
+                            buffs: {
+                                where: { type: 'DOUBLE_POINTS', active: true, remainingMatches: { gt: 0 } },
+                                select: { remainingMatches: true },
+                            },
+                        },
+                    },
+                },
+            },
+            teams: {
+                include: {
+                    members: {
+                        include: {
+                            participant: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    buffs: {
+                                        where: { type: 'DOUBLE_POINTS', active: true, remainingMatches: { gt: 0 } },
+                                        select: { remainingMatches: true },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
             matches: true,
         },
     })
+    if (!t) return null
+
+    const dto: TTournament = {
+        id: t.id,
+        title: t.title,
+        type: t.type as TournamentType,
+        mainPrize: t.mainPrize,
+        matchWinPrize: t.matchWinPrize,
+        consolationPrize: t.consolationPrize,
+        participants: t.participants.map(tp => ({
+            participantId: tp.participantId,
+            participant: { id: tp.participant.id, name: tp.participant.name },
+        })),
+        teams: t.teams.map(team => ({
+            id: team.id,
+            name: team.name,
+            members: team.members.map(m => ({
+                participant: { id: m.participant.id, name: m.participant.name },
+            })),
+        })),
+        matches: t.matches.map(m => ({
+            id: m.id,
+            round: m.round,
+            indexInRound: m.indexInRound,
+            participantAId: m.participantAId ?? undefined,
+            participantBId: m.participantBId ?? undefined,
+            winnerParticipantId: m.winnerParticipantId ?? undefined,
+            teamAId: m.teamAId ?? undefined,
+            teamBId: m.teamBId ?? undefined,
+            winnerTeamId: m.winnerTeamId ?? undefined,
+            nextMatchId: m.nextMatchId ?? undefined,
+            nextMatchSlot: m.nextMatchSlot ?? undefined,
+            scoreA: m.scoreA ?? undefined,
+            scoreB: m.scoreB ?? undefined,
+            isBye: m.isBye ?? undefined,
+            isPlayIn: m.isPlayIn ?? undefined,
+            bestOf: m.bestOf,
+            bracket: (m.bracket as BracketKind) ?? 'WINNERS',
+        })),
+    }
+
+    const dpMap: Record<string, number> = {}
+    for (const tp of t.participants) {
+        const sum = (tp.participant.buffs ?? []).reduce((acc, b) => acc + (b.remainingMatches ?? 0), 0)
+        if (sum > 0) dpMap[tp.participantId] = sum
+    }
+    for (const team of t.teams) {
+        for (const mem of team.members) {
+            const sum = (mem.participant.buffs ?? []).reduce((acc, b) => acc + (b.remainingMatches ?? 0), 0)
+            if (sum > 0) dpMap[mem.participant.id] = (dpMap[mem.participant.id] ?? 0) + sum
+        }
+    }
+
+    const matchIds = t.matches.map(m => m.id)
+    let doubledByMatch: Record<string, boolean> = {}
+    let doubledByMatchAndParticipant: Record<string, Record<string, boolean>> = {}
+    if (matchIds.length > 0) {
+        const doubledTxs = await prisma.transaction.findMany({
+            where: { matchId: { in: matchIds }, isDoubled: true },
+            select: { matchId: true, participantId: true },
+        })
+        for (const tx of doubledTxs) {
+            if (!tx.matchId || !tx.participantId) continue
+            doubledByMatch[tx.matchId] = true
+            ;(doubledByMatchAndParticipant[tx.matchId] ??= {})[tx.participantId] = true
+        }
+    }
+
+    return {
+        ...dto,
+        _dpRemainingByParticipant: dpMap,
+        _payoutDoubledByMatchId: doubledByMatch,
+        _payoutDoubledByMatchAndParticipant: doubledByMatchAndParticipant,
+    }
 }
 
 
 export async function deleteTournament(id: string) {
     return prisma.$transaction(async (tx) => {
         const matches = await tx.match.findMany({
-            where: { tournamentId: id },
-            select: { id: true },
+            where: {tournamentId: id},
+            select: {id: true},
         })
         const matchIds = matches.map((m) => m.id)
 
         if (matchIds.length > 0) {
             const txs = await tx.transaction.findMany({
-                where: { matchId: { in: matchIds } },
-                select: { id: true, participantId: true, amount: true },
+                where: {matchId: {in: matchIds}},
+                select: {id: true, participantId: true, amount: true},
             })
 
             if (txs.length > 0) {
@@ -63,8 +168,8 @@ export async function deleteTournament(id: string) {
                 }
 
                 const participants = await tx.participant.findMany({
-                    where: { id: { in: Array.from(deltaByUser.keys()) } },
-                    select: { id: true, balance: true },
+                    where: {id: {in: Array.from(deltaByUser.keys())}},
+                    select: {id: true, balance: true},
                 })
                 const balanceById = new Map(participants.map((p) => [p.id, p.balance]))
                 for (const [participantId, delta] of deltaByUser.entries()) {
@@ -80,28 +185,28 @@ export async function deleteTournament(id: string) {
                 for (const [participantId, delta] of deltaByUser.entries()) {
                     if (delta !== 0) {
                         await tx.participant.update({
-                            where: { id: participantId },
-                            data: { balance: { increment: delta } },
+                            where: {id: participantId},
+                            data: {balance: {increment: delta}},
                         })
                     }
                 }
 
                 await tx.transaction.deleteMany({
-                    where: { matchId: { in: matchIds } },
+                    where: {matchId: {in: matchIds}},
                 })
             }
         }
 
-        await tx.match.deleteMany({ where: { tournamentId: id } })
+        await tx.match.deleteMany({where: {tournamentId: id}})
         await tx.tournamentTeamMember.deleteMany({
-            where: { team: { tournamentId: id } },
+            where: {team: {tournamentId: id}},
         })
-        await tx.tournamentTeam.deleteMany({ where: { tournamentId: id } })
-        await tx.tournamentParticipant.deleteMany({ where: { tournamentId: id } })
+        await tx.tournamentTeam.deleteMany({where: {tournamentId: id}})
+        await tx.tournamentParticipant.deleteMany({where: {tournamentId: id}})
 
-        await tx.tournament.delete({ where: { id } })
+        await tx.tournament.delete({where: {id}})
 
-        return { ok: true }
+        return {ok: true}
     })
 }
 
@@ -110,13 +215,13 @@ export async function tournamentStarted(tournamentId: string): Promise<boolean> 
         where: {
             tournamentId,
             OR: [
-                { winnerParticipantId: { not: null } },
-                { winnerTeamId: { not: null } },
-                { scoreA: { not: null } },
-                { scoreB: { not: null } },
+                {winnerParticipantId: {not: null}},
+                {winnerTeamId: {not: null}},
+                {scoreA: {not: null}},
+                {scoreB: {not: null}},
             ],
         },
-        select: { id: true },
+        select: {id: true},
     })
     return !!any
 }

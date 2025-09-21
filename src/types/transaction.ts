@@ -1,4 +1,4 @@
-import { Transaction } from '@prisma/client'
+import {Transaction} from '@prisma/client'
 
 export type TransactionDb = Transaction
 
@@ -12,4 +12,5 @@ export type TransactionDto = {
     }
     balanceAfter?: number
     counterparty?: { id: string; name: string } | null
+    isDoubled?: boolean | false
 }

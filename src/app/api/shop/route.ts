@@ -1,16 +1,17 @@
 import {NextResponse} from 'next/server'
 import {prisma} from '@/server/db/prisma'
 import {
-    applyDiscountRound20,
+    applyDiscountRounded,
     getShopConfig
 } from "@/server/db/services/pricing.service";
 
 export async function GET() {
     const cfg = await getShopConfig()
-    const items = await prisma.shopItem.findMany({ orderBy: { label: 'asc' } })
+    const items = await prisma.shopItem.findMany({orderBy: {label: 'asc'}})
     const payload = items.map(i => ({
         ...i,
-        effectiveCost: applyDiscountRound20(i.cost, cfg.discountsEnabled, cfg.discountPercent),
+        effectiveCost: applyDiscountRounded(i.cost, cfg.discountsEnabled, cfg.discountPercent, {mode: 'preferred'})
+        ,
         discountsEnabled: cfg.discountsEnabled,
         discountPercent: cfg.discountPercent,
     }))

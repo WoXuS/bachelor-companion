@@ -170,7 +170,8 @@ export default function TransactionsClient({
                                     className={`font-semibold ${t.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
                                     {t.amount > 0 ? '+' : ''}{t.amount}
                                     <span
-                                        className="font-medium text-sm"> $pruch</span>
+                                        className="font-medium text-sm"> $pruch </span>{t.isDoubled && <span
+                                    className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[10px] font-semibold text-emerald-300">×2</span>}
                                     {typeof t.balanceAfter === 'number' && (
                                         <span
                                             className="ml-2 text-xs text-gray-400 font-medium">→ saldo po: {t.balanceAfter} $pruch</span>

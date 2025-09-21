@@ -1,8 +1,7 @@
 import {prisma} from '../prisma'
-import {getShopItem} from '../repositories/shop.repo'
-import {string} from "zod";
+import {applyDiscountRounded, getShopConfig} from "@/server/db/services/pricing.service";
 
-export async function addTransaction(participantId: string, amount: number, reason: string, matchId?: string, doublePoints?: boolean) {
+export async function addTransaction(participantId: string, amount: number, reason: string, matchId?: string, isDoubled?: boolean) {
     return prisma.$transaction(async (tx) => {
         const p = await tx.participant.findUnique({where: {id: participantId}, select: {balance: true}})
         if (!p) throw new Error('Participant not found')
@@ -11,23 +10,60 @@ export async function addTransaction(participantId: string, amount: number, reas
         if (next < 0) throw new Error('Niewystarczające środki')
 
         const created = await tx.transaction.create({
-            data: {participantId, amount, reason, balanceAfter: next, matchId: matchId ?? null, doublePoints: doublePoints ?? false},
+            data: {
+                participantId,
+                amount,
+                reason,
+                balanceAfter: next,
+                matchId: matchId ?? null,
+                isDoubled: isDoubled ?? false
+            },
         })
         await tx.participant.update({where: {id: participantId}, data: {balance: next}})
         return created
     })
 }
 
+const DP_KEY = 'double-points-4'
+const DP_PACK = 4
 
 export async function purchaseFor(participantId: string, itemId: string) {
-    const item = await getShopItem(itemId)
+    const [participant, item, cfg] = await Promise.all([
+        prisma.participant.findUnique({where: {id: participantId}, select: {id: true, balance: true}}),
+        prisma.shopItem.findUnique({where: {id: itemId}}),
+        getShopConfig(),
+    ])
+    if (!participant) throw new Error('Participant not found')
     if (!item) throw new Error('Item not found')
 
-    const participant = await prisma.participant.findUnique({where: {id: participantId}, select: {balance: true}})
-    if (!participant) throw new Error('Participant not found')
-    if (participant.balance < item.cost) throw new Error('Insufficient funds')
+    const price = applyDiscountRounded(
+        item.cost,
+        cfg.discountsEnabled,
+        cfg.discountPercent,
+        {mode: 'preferred'}
+    )
 
-    return addTransaction(participantId, -item.cost, `Zakup: ${item.label}`)
+    return prisma.$transaction(async (tx) => {
+        const p = await tx.participant.findUnique({where: {id: participantId}, select: {balance: true}})
+        if (!p) throw new Error('Participant not found')
+        if (p.balance - price < 0) throw new Error('Niewystarczające środki')
+
+        if (item.key === DP_KEY) {
+            await tx.participantBuff.upsert({
+                where: {participantId},
+                create: {participantId, type: 'DOUBLE_POINTS', remainingMatches: DP_PACK, active: true},
+                update: {remainingMatches: {increment: DP_PACK}, active: true, type: 'DOUBLE_POINTS'},
+            })
+        }
+
+        await addTransaction(
+            participantId,
+            -price,
+            `Zakup: ${item.label}${cfg.discountsEnabled ? ` (-${cfg.discountPercent}%)` : ''}`
+        )
+
+        return true
+    })
 }
 
 export async function transferBetween(

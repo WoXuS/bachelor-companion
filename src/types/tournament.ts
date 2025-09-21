@@ -1,4 +1,4 @@
-import {Tournament} from '@prisma/client'
+import {Tournament, Prisma} from '@prisma/client'
 
 export type TournamentDb = Tournament
 
@@ -14,6 +14,7 @@ export type BracketKind = 'WINNERS' | 'LOSERS' | 'GRAND_FINAL'
 
 export type TMatch = {
     id: string
+    tournamentId: string
     round: number
     indexInRound: number
     participantAId?: string | null
@@ -42,4 +43,7 @@ export type TTournament = {
     participants: TTP[]
     teams: TTeam[]
     matches: TMatch[]
+    _dpRemainingByParticipant?: Record<string, number>
+    _payoutDoubledByMatchId?: Record<string, boolean>
+    _payoutDoubledByMatchAndParticipant?: Record<string, Record<string, boolean>>
 }
