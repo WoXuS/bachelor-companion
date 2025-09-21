@@ -1,27 +1,53 @@
 'use client'
 
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
-import {useEffect, useState} from 'react'
+import React, {useEffect, useMemo, useState} from 'react'
 import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {getAdmin} from "@/hooks/useAdmin";
-import Link from "next/link";
-import {ParticipantDto} from "@/types/participant";
-import {ShopItemDto} from "@/types/shop-item";
-import {toast} from "sonner";
-import {CustomLoader} from "@/components/ui/CustomLoader";
-import {Cog} from "lucide-react";
+import {getAdmin} from "@/hooks/useAdmin"
+import Link from "next/link"
+import {ParticipantDto} from "@/types/participant"
+import {ShopItemDto} from "@/types/shop-item"
+import {toast} from "sonner"
+import {CustomLoader} from "@/components/ui/CustomLoader"
+import {Cog} from "lucide-react"
 
-async function fetchShop(): Promise<ShopItemDto[]> {
-    const res = await fetch('/api/shop')
+/** ---------- Types & helpers ---------- */
+
+type ShopItemView = ShopItemDto & {
+    effectiveCost?: number // returned by /api/shop
+}
+
+type ShopConfig = {
+    discountsEnabled: boolean
+    discountPercent: number
+}
+
+function priceState(item: ShopItemView) {
+    const effective = item.effectiveCost ?? item.cost
+    if (effective < item.cost) return {kind: 'discount' as const, delta: item.cost - effective}
+    if (effective > item.cost) return {kind: 'surcharge' as const, delta: effective - item.cost}
+    return {kind: 'normal' as const, delta: 0}
+}
+
+function prettyDeltaPercent(base: number, effective: number) {
+    if (!base) return '0%'
+    const pct = Math.round(((effective - base) / base) * 100)
+    return (pct > 0 ? `+${pct}%` : `${pct}%`)
+}
+
+/** ---------- Data fetching ---------- */
+
+async function fetchShop(): Promise<ShopItemView[]> {
+    const res = await fetch('/api/shop', {cache: 'no-store'})
     if (!res.ok) throw new Error('Failed to load shop')
     return res.json()
 }
 
 async function fetchParticipants(): Promise<ParticipantDto[]> {
-    const res = await fetch('/api/participants')
+    const res = await fetch('/api/participants', {cache: 'no-store'})
     if (!res.ok) throw new Error('Failed to load participants')
     return res.json()
 }
@@ -37,47 +63,28 @@ async function purchase(participantId: string, itemId: string) {
         try {
             const data = await res.json()
             if (data?.message) message = data.message
-        } catch {
-        }
+        } catch {}
         throw new Error(message)
     }
     return res.json()
 }
 
 async function upsertShopItem(data: Partial<ShopItemDto>) {
-    if (data.id) {
-        const res = await fetch('/api/shop/manage', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data),
-        })
-        if (!res.ok) {
-            let message = 'Failed to update Shop Item'
-            try {
-                const data = await res.json()
-                if (data?.message) message = data.message
-            } catch {
-            }
-            throw new Error(message)
-        }
-        return res.json()
-    } else {
-        const res = await fetch('/api/shop/manage', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data),
-        })
-        if (!res.ok) {
-            let message = 'Failed to create Shop Item'
-            try {
-                const data = await res.json()
-                if (data?.message) message = data.message
-            } catch {
-            }
-            throw new Error(message)
-        }
-        return res.json()
+    const method = data.id ? 'PUT' : 'POST'
+    const res = await fetch('/api/shop/manage', {
+        method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+        let message = data.id ? 'Failed to update Shop Item' : 'Failed to create Shop Item'
+        try {
+            const j = await res.json()
+            if (j?.message) message = j.message
+        } catch {}
+        throw new Error(message)
     }
+    return res.json()
 }
 
 async function removeShopItem(id: string) {
@@ -85,72 +92,65 @@ async function removeShopItem(id: string) {
     if (!res.ok) {
         let message = 'Failed to delete Shop Item'
         try {
-            const data = await res.json()
-            if (data?.message) message = data.message
-        } catch {
-        }
+            const j = await res.json()
+            if (j?.message) message = j.message
+        } catch {}
         throw new Error(message)
     }
     return res.json()
 }
 
-async function fetchShopConfig() {
+async function fetchShopConfig(): Promise<ShopConfig> {
     const r = await fetch('/api/shop/config', {cache: 'no-store'})
     if (!r.ok) throw new Error('Failed to load config')
     return r.json()
 }
 
-async function updateShopConfig(patch: { discountsEnabled?: boolean; discountPercent?: number }) {
+async function updateShopConfig(patch: Partial<ShopConfig>) {
     const r = await fetch('/api/shop/config', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(patch)
+        body: JSON.stringify(patch),
     })
     if (!r.ok) throw new Error('Failed to update config')
     return r.json()
 }
 
+/** ---------- Page ---------- */
 
 export default function HomePage() {
-    const {data} = useQuery({queryKey: ['me'], queryFn: getAdmin})
-    const isAdmin = !!data?.isAdmin
+    const {data: me} = useQuery({queryKey: ['me'], queryFn: getAdmin, staleTime: 30_000})
+    const isAdmin = !!me?.isAdmin
+
     const {data: items = [], isLoading} = useQuery({queryKey: ['shop'], queryFn: fetchShop})
+    const {data: cfg} = useQuery({queryKey: ['shop-config'], queryFn: fetchShopConfig})
+
     const {data: participants = []} = useQuery({
         queryKey: ['participants'],
         queryFn: fetchParticipants,
         enabled: isAdmin,
     })
-    const qc = useQueryClient()
 
-    const {data: cfg} = useQuery({queryKey: ['shop-config'], queryFn: fetchShopConfig})
-    const updateCfg = useMutation({
-        mutationFn: updateShopConfig,
-        onSuccess: () => qc.invalidateQueries({queryKey: ['shop-config']}) || qc.invalidateQueries({queryKey: ['shop']})
-    })
+    const qc = useQueryClient()
 
     const mutation = useMutation({
         mutationFn: ({participantId, itemId}: { participantId: string; itemId: string }) =>
             purchase(participantId, itemId),
         onSuccess: () => {
-            toast.success("Zakup pomyślny");
+            toast.success("Zakup pomyślny")
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['ranking']})
         },
-        onError: (error: any) => {
-            toast.error(`Zakup niepomyślny: ${error.message}`);
-        }
+        onError: (error: any) => toast.error(`Zakup niepomyślny: ${error.message}`),
     })
-
 
     const save = useMutation({
         mutationFn: upsertShopItem,
         onSuccess: () => {
             qc.invalidateQueries({queryKey: ['shop']})
-            toast.success('Przedmiot zapisany pomyślnie')
+            toast.success('Przedmiot zapisany')
         },
-        onError: (err: any) => {
-            toast.error(`Błąd przy zapisie: ${err.message}`)
-        },
+        onError: (err: any) => toast.error(`Błąd przy zapisie: ${err.message}`),
     })
 
     const del = useMutation({
@@ -159,111 +159,168 @@ export default function HomePage() {
             qc.invalidateQueries({queryKey: ['shop']})
             toast.success('Przedmiot usunięty')
         },
-        onError: (err: any) => {
-            toast.error(`Błąd przy usuwaniu: ${err.message}`)
-        },
+        onError: (err: any) => toast.error(`Błąd przy usuwaniu: ${err.message}`),
     })
+
+    const headerBadge = useMemo(() => {
+        if (!cfg) return null
+        if (!cfg.discountsEnabled) {
+            return (
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-600/50 bg-slate-800/50 px-2 py-0.5 text-xs text-slate-300">
+          Ceny standardowe
+        </span>
+            )
+        }
+        // Pokazuj realny procent w configu (UI nie zgaduje z itemów)
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
+        Obniżka −{cfg.discountPercent}%
+      </span>
+        )
+    }, [cfg])
 
     if (isLoading) return <CustomLoader/>
 
     return (
-        <div className="max-w-2xl mx-auto p-6 space-y-6 pt-20">
-            <h1 className="text-2xl font-bold mb-4">Cennik</h1>
-            {items[0] && (
-                <div className="mb-2 text-sm">
-                    {items[0].discountsEnabled &&
-                        <span className="rounded border px-2 py-1">Ceny -{items[0].discountPercent}%</span>}
-                </div>
-            )}
-            {isAdmin && cfg && (
-                <div className="mb-4 flex items-center gap-2">
-                    <Button
-                        size="sm"
-                        variant={cfg.discountsEnabled ? 'secondary' : 'default'}
-                        onClick={() => updateCfg.mutate({discountsEnabled: !cfg.discountsEnabled})}
-                    >
-                        {cfg.discountsEnabled ? 'Wyłącz zniżki' : 'Włącz zniżki (-20%)'}
-                    </Button>
-                    <AdminShopControls/>
-                </div>
-            )}
+        <div className="mx-auto max-w-2xl space-y-6 p-6 pt-20">
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">Cennik</h1>
+                {headerBadge}
+            </div>
+
+            {isAdmin && <AdminShopControls/>}
+
             <ul className="space-y-3">
-                {items.map((item) => (
-                    <li
-                        key={item.id}
-                        className="flex items-center justify-between border rounded-lg p-3 bg-white/5"
-                    >
-                        <div className="flex flex-col gap-2">
-                            <div className="font-medium text-sm">{item.label}</div>
-                            <div className="text-sm text-gray-400">
-                                {('effectiveCost' in item ? (item as any).effectiveCost : item.cost)} $pruch
-                                {('effectiveCost' in item && (item as any).effectiveCost !== item.cost) && (
-                                    <s className="ml-2 text-xs text-gray-500">(bazowo {item.cost})</s>
-                                )}
+                {items.map((item) => {
+                    const effective = item.effectiveCost ?? item.cost
+                    const state = priceState(item)
+                    const showStriked = effective !== item.cost
+
+                    return (
+                        <li
+                            key={item.id}
+                            className="group flex items-center justify-between rounded-lg border border-slate-700/60 bg-gradient-to-br from-slate-900/60 to-slate-900/30 p-3 shadow-sm transition hover:border-slate-500/50 hover:shadow"
+                        >
+                            <div className="flex min-w-0 flex-col gap-1">
+                                <div className="truncate text-sm font-medium text-slate-100">{item.label}</div>
+
+                                {/* Price line */}
+                                <div className="flex items-center gap-2">
+                                    {state.kind === 'discount' && (
+                                        <>
+                      <span className="text-sm font-semibold text-emerald-400">
+                        {effective} $pruch
+                      </span>
+                                            {showStriked && (
+                                                <span className="text-xs text-slate-400 line-through">
+                          {item.cost} $pruch
+                        </span>
+                                            )}
+                                            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+                        {prettyDeltaPercent(item.cost, effective)}
+                      </span>
+                                        </>
+                                    )}
+
+                                    {state.kind === 'surcharge' && (
+                                        <>
+                      <span className="text-sm font-semibold text-rose-400">
+                        {effective} $pruch
+                      </span>
+                                            {showStriked && (
+                                                <span className="text-xs text-slate-400 line-through">
+                          {item.cost} $pruch
+                        </span>
+                                            )}
+                                            <span className="rounded-full border border-rose-500/40 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-300">
+                        {prettyDeltaPercent(item.cost, effective)}
+                      </span>
+                                        </>
+                                    )}
+
+                                    {state.kind === 'normal' && (
+                                        <span className="text-sm font-semibold text-slate-200">
+                      {item.cost} $pruch
+                    </span>
+                                    )}
+                                </div>
                             </div>
 
-                        </div>
-                        {isAdmin && (
-                            <div className="flex gap-1">
-                                <AddEditItemDialog onSave={(d) => save.mutate(d)} shopItem={item}
-                                                   onDelete={() => del.mutate(item.id)}/>
-                                <PurchaseDialog
-                                    item={item}
-                                    participants={participants}
-                                    onPurchase={(pid) => {
-                                        mutation.mutate({participantId: pid, itemId: item.id})
-                                    }}
-                                />
-                            </div>
-                        )}
-                    </li>
-                ))}
+                            {isAdmin && (
+                                <div className="flex shrink-0 gap-1">
+                                    <AddEditItemDialog
+                                        onSave={(d) => save.mutate(d)}
+                                        shopItem={item}
+                                        onDelete={() => del.mutate(item.id)}
+                                    />
+                                    <PurchaseDialog
+                                        item={item}
+                                        participants={participants}
+                                        onPurchase={(pid) => mutation.mutate({participantId: pid, itemId: item.id})}
+                                    />
+                                </div>
+                            )}
+                        </li>
+                    )
+                })}
+
                 {isAdmin && (
                     <li>
                         <AddEditItemDialog onSave={(d) => save.mutate(d)}/>
                     </li>
                 )}
             </ul>
-            <h1 className="text-2xl font-bold mb-4">Jak grać?</h1>
-            <p>
-                Zbierasz <span className="text-primary">$pruch Dollary</span> wykonując różne czynności.<br/>
-                Możesz wydawać <span className="text-primary">$pruch Dollary</span> na przedmioty z cennika.<br/>
-                Osoby z największą liczbą <span className="text-primary">$pruch Dollarów</span> na koniec wyjazdu
-                wygrywają nagrody.
-            </p>
-            <h1 className="text-lg font-bold mb-4">Po co wydawać <span className="text-primary">$pruch Dollary</span> na
-                rzeczy z cennika?</h1>
-            <p>
-                Teoretycznie można całą gre kisić Dollary i nic nie kupować, ale przyjmijmy taką sytuację:<br/>
-                Jesteś na pierwszym miejscu w <Button asChild variant="link" size="icon">
-                <Link href="/ranking"> rankingu</Link>
-            </Button> i widzisz że zaraz ktoś z drugiego miejsca wygra mini grę i Cię wyprzedzi. Możesz więc zakupić coś
-                co mu w tym przeszkodzi i zwiększyć swoje szanse na utrzymanie prowadzenia.
-            </p>
+
+            <section className="space-y-2">
+                <h2 className="text-lg font-bold">Jak grać?</h2>
+                <p className="text-slate-300">
+                    Zbierasz <span className="text-primary">$pruch Dollary</span> wykonując różne czynności.
+                    <br/>
+                    Możesz wydawać <span className="text-primary">$pruch Dollary</span> na przedmioty z cennika.
+                    <br/>
+                    Osoby z największą liczbą <span className="text-primary">$pruch Dollarów</span> na koniec wyjazdu
+                    wygrywają nagrody.
+                </p>
+                <h3 className="text-base font-bold">Po co wydawać <span className="text-primary">$pruch Dollary</span>?</h3>
+                <p className="text-slate-300">
+                    Teoretycznie można kisić Dollary, ale jeśli widzisz, że ktoś tuż za Tobą może wygrać mini-grę,
+                    użyj sklepu, żeby to zneutralizować i utrzymać prowadzenie. Sprawdź{' '}
+                    <Button asChild variant="link" size="sm" className="h-auto p-0 align-baseline">
+                        <Link href="/ranking">ranking</Link>
+                    </Button>
+                    .
+                </p>
+            </section>
         </div>
     )
 }
+
+/** ---------- Dialogs ---------- */
 
 function PurchaseDialog({
                             item,
                             participants,
                             onPurchase,
                         }: {
-    item: ShopItemDto
+    item: ShopItemView
     participants: ParticipantDto[]
     onPurchase: (participantId: string) => void
 }) {
     const [open, setOpen] = useState(false)
     const [selected, setSelected] = useState<string | null>(null)
 
-    const chosen = participants.find((p) => p.id === selected)
-    const newBalance = chosen ? chosen.balance - item.cost : null
+    const effective = item.effectiveCost ?? item.cost
+    const chosen = useMemo(
+        () => participants.find((p) => p.id === selected) ?? null,
+        [participants, selected]
+    )
+    const newBalance = chosen ? chosen.balance - effective : null
     const canAfford = newBalance !== null && newBalance >= 0
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm">Kup dla</Button>
+                <Button size="sm" variant="secondary">Kup dla</Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
@@ -272,7 +329,12 @@ function PurchaseDialog({
                 <div className="flex flex-col gap-3">
                     <div>
                         <div className="mb-1 font-medium">{item.label}</div>
-                        <div className="text-sm text-gray-500">Koszt: {item.cost}</div>
+                        <div className="text-sm text-slate-400">
+                            Koszt: <span className="font-semibold text-slate-200">{effective}</span>{' '}
+                            {effective !== item.cost && (
+                                <span className="ml-1 text-xs text-slate-500 line-through">{item.cost}</span>
+                            )} $pruch
+                        </div>
                     </div>
 
                     <Select onValueChange={(v) => setSelected(v)}>
@@ -289,7 +351,7 @@ function PurchaseDialog({
                     </Select>
 
                     {chosen && (
-                        <p className={`text-sm ${canAfford ? 'text-green-400' : 'text-red-400'}`}>
+                        <p className={`text-sm ${canAfford ? 'text-emerald-400' : 'text-destructive'}`}>
                             Saldo po zakupie: {newBalance}
                         </p>
                     )}
@@ -311,7 +373,6 @@ function PurchaseDialog({
     )
 }
 
-
 function AddEditItemDialog({
                                shopItem,
                                onSave,
@@ -324,7 +385,7 @@ function AddEditItemDialog({
     const [open, setOpen] = useState(false)
     const [key, setKey] = useState((shopItem?.key ?? ''))
     const [label, setLabel] = useState(shopItem?.label ?? '')
-    const [cost, setCost] = useState(shopItem?.cost ?? 1)
+    const [cost, setCost] = useState(shopItem?.cost ?? 20)
     const [category, setCategory] = useState(shopItem?.category ?? '')
 
     function onOpenChange(v: boolean) {
@@ -332,7 +393,7 @@ function AddEditItemDialog({
         if (!v && !shopItem) {
             setLabel('')
             setKey('')
-            setCost(1)
+            setCost(20)
             setCategory('')
         }
     }
@@ -370,15 +431,13 @@ function AddEditItemDialog({
                     />
                     <Select value={category ?? ''} onValueChange={setCategory}>
                         <SelectTrigger>
-                            <SelectValue placeholder="Wybierz kategorie"/>
+                            <SelectValue placeholder="Wybierz kategorię"/>
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value='trolling'>
-                                Trolling
-                            </SelectItem>
-                            <SelectItem value='buff'>
-                                Buff
-                            </SelectItem>
+                            <SelectItem value='trolling'>Trolling</SelectItem>
+                            <SelectItem value='buff'>Buff</SelectItem>
+                            <SelectItem value='immunitet'>Immunitet</SelectItem>
+                            <SelectItem value='fun'>Fun</SelectItem>
                         </SelectContent>
                     </Select>
                     <div className="flex gap-2">
@@ -416,6 +475,8 @@ function AddEditItemDialog({
     )
 }
 
+/** ---------- Admin Controls ---------- */
+
 function AdminShopControls() {
     const qc = useQueryClient()
     const {data: cfg} = useQuery({queryKey: ['shop-config'], queryFn: fetchShopConfig})
@@ -446,32 +507,30 @@ function AdminShopControls() {
     }
 
     return (
-        <div className="mb-4 rounded-lg border p-3 bg-white/5 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-                <div className="text-sm">
-                    {cfg?.discountsEnabled ? `Ceny aktywne: -${cfg.discountPercent}%` : 'Ceny standardowe'}
+        <div className="rounded-lg border border-slate-700/60 bg-slate-900/50 p-3 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex items-center gap-2">
+                    <Button size="sm" variant={cfg?.discountsEnabled ? 'secondary' : 'default'} onClick={toggle}>
+                        {cfg?.discountsEnabled ? 'Wyłącz zniżki' : 'Włącz zniżki'}
+                    </Button>
+                    <div className="text-xs text-slate-400">
+                        Zaokrąglenie cen do najbliższej 20 po stronie serwera
+                    </div>
                 </div>
-                <Button size="sm" variant={cfg?.discountsEnabled ? 'secondary' : 'default'} onClick={toggle}>
-                    {cfg?.discountsEnabled ? 'Wyłącz zniżki' : 'Włącz zniżki'}
-                </Button>
-            </div>
 
-            <div className="flex items-center gap-2">
-                <Input
-                    type="number"
-                    value={localPercent}
-                    onChange={(e) => setLocalPercent(Number(e.target.value))}
-                    className="w-24"
-                    min={0}
-                    max={80}
-                    step={5}
-                />
-                <span className="text-sm text-gray-400">% zniżki (0–80)</span>
-                <Button size="sm" onClick={savePercent}>Zapisz %</Button>
-            </div>
-
-            <div className="text-xs text-gray-500">
-                Zniżka liczy się na backendzie i zaokrąglana jest do najbliższej 20.
+                <div className="flex items-center gap-2">
+                    <Input
+                        type="number"
+                        value={localPercent}
+                        onChange={(e) => setLocalPercent(Number(e.target.value))}
+                        className="w-24"
+                        min={0}
+                        max={80}
+                        step={5}
+                    />
+                    <span className="text-sm text-slate-400">% zniżki (0–80)</span>
+                    <Button size="sm" onClick={savePercent}>Zapisz %</Button>
+                </div>
             </div>
         </div>
     )
