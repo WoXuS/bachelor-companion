@@ -29,12 +29,12 @@ async function main() {
     )
 
     const items = [
-        {key: 'give-shot', label: 'Każ komuś wypić szota', cost: 50, category: 'trolling'},
-        {key: 'swimming-goggles', label: 'Okulary do pływania przez 10 minut', cost: 100, category: 'trolling'},
-        {key: 'jump-lake', label: 'Zanurzenie głowy / skok do jeziora', cost: 150, category: 'trolling'},
-        {key: 'switch-opponent', label: 'Zmiana przeciwnika w następnym meczu', cost: 100, category: 'trolling'},
-        {key: 'left-hand', label: 'Lewa ręka – kara w następnym meczu', cost: 150, category: 'trolling'},
-        {key: 'freeze-casino', label: 'Zamrożenie hazardu na 10 min', cost: 150, category: 'trolling'},
+        {key: 'give-shot', label: 'Każ komuś wypić szota', cost: 50, category: 'przeszkadzanie'},
+        {key: 'swimming-goggles', label: 'Okulary do pływania przez 10 minut', cost: 100, category: 'przeszkadzanie'},
+        {key: 'jump-lake', label: 'Zanurzenie głowy / skok do jeziora', cost: 150, category: 'przeszkadzanie'},
+        {key: 'switch-opponent', label: 'Zmiana przeciwnika w następnym meczu', cost: 100, category: 'przeszkadzanie'},
+        {key: 'left-hand', label: 'Lewa ręka – kara w następnym meczu', cost: 150, category: 'przeszkadzanie'},
+        {key: 'freeze-casino', label: 'Zamrożenie hazardu na 10 min', cost: 150, category: 'przeszkadzanie'},
 
         {key: 'immunity', label: 'Immunitet (nikt Ci nie przeszkadza do końca mini-gry)', cost: 150, category: 'buff'},
         {key: 'double-points-4', label: 'Double Points (4 kolejne mecze turniejowe)', cost: 120, category: 'buff'},

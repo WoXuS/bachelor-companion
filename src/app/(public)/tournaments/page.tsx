@@ -12,8 +12,9 @@ import {DuelDto} from '@/types/duel'
 import {computeTournamentStatus} from './[id]/utils/summary'
 import {EditTournamentDialog} from "./components/EditTournamentDialog";
 import {NewDuelDialog, NewTournamentDialog} from "./components/CreateNewDialogs";
-import {ChevronRight, Crown} from "lucide-react";
+import {ChevronRight, Crown, Trash2} from "lucide-react";
 import {EditDuelDialog} from "@/app/(public)/tournaments/components/EditDuelDialog";
+import * as React from "react";
 
 async function fetchTournaments(): Promise<TournamentListItemDto[]> {
     const res = await fetch('/api/tournaments')
@@ -76,6 +77,20 @@ export default function TournamentsPage() {
         }, onError: (e: any) => toast.error(e.message)
     })
 
+    const deleteTournamentMut = useMutation({
+        mutationFn: async (tournamentId: string) => {
+            const r = await fetch(`/api/tournaments/${tournamentId}`, {method: 'DELETE'})
+            const j = await r.json().catch(() => ({}))
+            if (!r.ok) throw new Error(j?.message || 'Delete failed')
+            return j
+        },
+        onSuccess: () => {
+            toast.success('Usunięto turniej i cofnięto jego transakcje')
+            qc.invalidateQueries()
+        },
+        onError: (e: any) => toast.error(e.message),
+    })
+
     if (tLoading || dLoading) return <CustomLoader/>
     return (
         <div className="max-w-4xl mx-auto p-6 space-y-6 pt-20">
@@ -117,6 +132,20 @@ export default function TournamentsPage() {
                                     </div>
                                     <div className="flex items-stretch">
                                         {isAdmin && !finished && <EditTournamentDialog tournamentId={t.id}/>}
+                                        {isAdmin && finished && <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            className="h-full rounded-none"
+                                            onClick={() => {
+                                                if (
+                                                    confirm(
+                                                        'Na pewno? To cofnie wszystkie wypłaty powiązane z tym turniejem (o ile nikt nie spadnie poniżej 0) i usunie turniej.'
+                                                    )
+                                                ) {
+                                                    deleteTournamentMut.mutate(t.id)
+                                                }
+                                            }}
+                                            disabled={deleteTournamentMut.isPending}><Trash2 size={24}/></Button>}
                                         <Button asChild className="h-full rounded-none rounded-e-lg" size="sm">
                                             <Link href={`/tournaments/${t.id}`}><ChevronRight/></Link>
                                         </Button>
@@ -141,16 +170,20 @@ export default function TournamentsPage() {
                                         <div
                                             className={`${d.winner?.name === d.playerA?.name ? 'text-emerald-400 relative' : ''}`}>
                                             {d.playerA?.name ?? '—'}
-                                            {d.winner?.name === d.playerA?.name && <Crown className="absolute -top-1.5 -right-2 transform-[rotate(19deg)]" color="#EFBF04"
-                                                                                          size={13}/>}
+                                            {d.winner?.name === d.playerA?.name &&
+                                                <Crown className="absolute -top-1.5 -right-2 transform-[rotate(19deg)]"
+                                                       color="#EFBF04"
+                                                       size={13}/>}
                                         </div>
                                         vs
                                         <div
                                             className={`${d.winner?.name === d.playerB?.name ? 'text-emerald-400 relative' : ''}`}>
-                                        {d.playerB?.name ?? '—'}
-                                            {d.winner?.name === d.playerB?.name && <Crown className="absolute -top-1.5 -right-2 transform-[rotate(19deg)]" color="#EFBF04"
-                                                                                          size={13}/>}
-                                    </div>
+                                            {d.playerB?.name ?? '—'}
+                                            {d.winner?.name === d.playerB?.name &&
+                                                <Crown className="absolute -top-1.5 -right-2 transform-[rotate(19deg)]"
+                                                       color="#EFBF04"
+                                                       size={13}/>}
+                                        </div>
                                     </div>
                                     <div className="text-xs text-gray-400">Stawka: <span
                                         className="text-primary">{d.stake} $pruch</span></div>

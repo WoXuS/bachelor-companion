@@ -32,7 +32,7 @@ export async function revertTransaction(id: string) {
 
         const newBalance = p.balance - original.amount
         if (newBalance < 0) {
-            throw new Error('Revert would make balance negative')
+            throw new Error(`Cofnięcie obniżyłoby saldo poniżej zera dla ${original.participantId}.`)
         }
 
         const created = await tx.transaction.create({
@@ -50,5 +50,32 @@ export async function revertTransaction(id: string) {
         })
 
         return created
+    })
+}
+
+export async function deleteTransaction(id: string) {
+    return prisma.$transaction(async (tx) => {
+        const transaction = await tx.transaction.findUnique({where: {id}})
+        if (!transaction) throw new Error('Transaction not found')
+
+        const p = await tx.participant.findUnique({
+            where: {id: transaction.participantId},
+            select: {balance: true},
+        })
+        if (!p) throw new Error('Participant not found')
+
+        const newBalance = p.balance - transaction.amount
+        if (newBalance < 0) {
+            throw new Error(`Usunięcie obniżyłoby saldo poniżej zera dla ${transaction.participantId}.`)
+        }
+
+        await tx.transaction.delete({where: {id: transaction.id}})
+
+        await tx.participant.update({
+            where: {id: transaction.participantId},
+            data: {balance: newBalance},
+        })
+
+        return {ok: true}
     })
 }

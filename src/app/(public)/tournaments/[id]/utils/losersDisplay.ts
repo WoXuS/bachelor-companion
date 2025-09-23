@@ -59,6 +59,7 @@ export function buildLosersDisplayColumns(all: TMatch[]): VirtualMatch[][] {
             if (!col0Slots[pos]) {
                 col0Slots[pos] = {
                     id: `virtual-l0-${m.id}-A`,
+                    tournamentId: `virtual-l0-tid-${m.id}-A`,
                     round: minRound,
                     indexInRound: pos,
                     participantAId: m.participantAId ?? null,
@@ -84,6 +85,7 @@ export function buildLosersDisplayColumns(all: TMatch[]): VirtualMatch[][] {
             if (!col0Slots[pos]) {
                 col0Slots[pos] = {
                     id: `virtual-l0-${m.id}-B`,
+                    tournamentId: `virtual-l0-tid-${m.id}-B`,
                     round: minRound,
                     indexInRound: pos,
                     participantAId: m.participantBId ?? null,

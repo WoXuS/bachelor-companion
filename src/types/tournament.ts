@@ -25,6 +25,7 @@ export type TMatch = {
     winnerTeamId?: string | null
     nextMatchId?: string | null
     nextMatchSlot?: string | null
+    loserNextMatchId?: string | null
     scoreA?: number | null
     scoreB?: number | null
     isBye?: boolean

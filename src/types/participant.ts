@@ -18,6 +18,4 @@ type ParticipantBuff = {
     type: BuffType
 }
 
-export enum BuffType {
-    DOUBLE_POINTS
-}
+export type BuffType = "DOUBLE_POINTS"

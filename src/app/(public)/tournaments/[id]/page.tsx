@@ -57,7 +57,7 @@ function buildFurthestActiveMatchIdByParticipant(matches: TMatch[]) {
         for (const pid of ids) {
             const curr = map[pid]
             if (!curr || (m.round ?? 0) > curr.round) {
-                map[pid] = { round: m.round ?? 0, matchId: m.id }
+                map[pid] = {round: m.round ?? 0, matchId: m.id}
             }
         }
     }
@@ -162,7 +162,8 @@ export default function TournamentDetailPage() {
             </span>
                     </p>
                     <p>
-                        Drabinka przegranych jest budowana z przegranych rund kwalifikacyjnej oraz pierwszej. Jeżeli liczba graczy
+                        Drabinka przegranych jest budowana z przegranych rund kwalifikacyjnej oraz pierwszej. Jeżeli
+                        liczba graczy
                         nie jest potęgą 2, zostanie rozegrany play-in (runda kwalifikacyjna drabinki przegranych).
                     </p>
                 </>

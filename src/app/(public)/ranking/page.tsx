@@ -7,7 +7,7 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@
 import {Input} from '@/components/ui/input'
 import {useState} from 'react'
 import {CustomLoader} from '@/components/ui/CustomLoader'
-import {BuffType, ParticipantDto} from "@/types/participant";
+import {ParticipantDto} from "@/types/participant";
 import {getAdmin} from "@/hooks/useAdmin";
 import {Receipt} from "lucide-react";
 import Link from "next/link";
@@ -49,14 +49,13 @@ export default function RankingPage() {
 
     if (isLoading) return <CustomLoader/>
     if (isError) return <p>Coś poszło nie tak</p>
-    console.log(ranking)
     return (
         <div className="max-w-2xl mx-auto p-4 flex flex-col gap-4 pt-20">
             <h1 className="text-3xl font-bold text-center mb-6">Ranking</h1>
 
             <Podium
                 top3={podium}
-                onSubmit={({id, amount, reason}) =>
+                onSubmitAction={({id, amount, reason}) =>
                     mutation.mutate({id, amount, reason})
                 }
                 isAdmin={isAdmin}
@@ -70,14 +69,25 @@ export default function RankingPage() {
                     >
                         <Link href={`/transactions/${p.id}`} className="flex items-center gap-2">
                             <p className="bg-primary-foreground rounded-e-4xl rounded-s-[9%] py-3 w-10 sm:w-15 h-[76px] flex items-center justify-center">{idx + 4}</p>
+
                             <Image
                                 src={p.avatarUrl ?? '/images/participants/default.png'}
                                 alt={p.name}
                                 width={60}
                                 height={60}
-                                className="rounded-full py-2"
+                                className="rounded-full py-2 "
                             />
-                            <span className="font-medium">{p.name}</span>
+
+                            <p className="flex flex-col gap-0.5">
+                                <span className="font-medium">{p.name}</span>
+                                {p.buffs?.map(buff => (
+                                    buff.type === "DOUBLE_POINTS" && buff.remainingMatches > 0 &&
+                                    <span key={buff.id}
+                                          className="w-fit rounded-full border border-emerald-500/40 bg-emerald-500/60 px-1.5 text-[10px] font-semibold text-emerald-300">
+                                        Punkty x2 ({buff.remainingMatches})
+                                    </span>
+                                ))}
+                            </p>
 
 
                         </Link>
@@ -86,12 +96,6 @@ export default function RankingPage() {
                                 className={`bg-primary-foreground/70 rounded-md px-3  ${p.balance > 999 ? 'text-sm py-2' : 'text-md py-1'} font-bold flex gap-[5px] items-center`}>
                                 <p>{p.balance}</p>
                                 <Receipt size="20"/>
-                                {p.buffs?.map(buff => (
-                                    <span key={buff.id}
-                                          className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 text-[10px] font-semibold text-emerald-300">
-                                    {buff.type === BuffType.DOUBLE_POINTS && `2x (${buff.remainingMatches})`}
-                                </span>
-                                ))}
                             </div>
                             {isAdmin && (
                                 <AddPointsDialog participantId={p.id} mutate={mutation.mutate}/>

@@ -11,6 +11,39 @@ import {RefreshCw} from "lucide-react"
 
 const winsNeeded = (bestOf?: number) => Math.ceil((bestOf ?? 1) / 2)
 
+const started = (m: TMatch) =>
+    !!(m.winnerParticipantId || m.winnerTeamId || m.scoreA != null || m.scoreB != null)
+
+function canRevertMatchLocal(tournamentMatches: TMatch[], startId: string) {
+    const matchesById = new Map(tournamentMatches.map(match => [match.id, match]))
+    const start = matchesById.get(startId)
+    if (!start) return false
+
+    const visit = new Set<string>()
+    const q: TMatch[] = []
+    let maxStartedRound = start.round
+
+    const push = (id?: string | null) => {
+        if (!id || visit.has(id)) return
+        const m = matchesById.get(id)
+        if (!m) return
+        visit.add(id)
+        q.push(m)
+    }
+
+    push(start.nextMatchId)
+    push(start.loserNextMatchId)
+
+    while (q.length) {
+        const m = q.shift()!
+        if (started(m)) maxStartedRound = Math.max(maxStartedRound, m.round)
+        push(m.nextMatchId)
+        push(m.loserNextMatchId)
+    }
+
+    return maxStartedRound < start.round + 1
+}
+
 export function MatchCard({
                               match, tournament, canEdit, roundNumber,
                               onReportAction, hasWinnersPlayInRound0,
@@ -145,12 +178,17 @@ export function MatchCard({
     const isFurthestA = pidA && furthestActiveMatchIdByParticipant?.[pidA] === match.id
     const isFurthestB = pidB && furthestActiveMatchIdByParticipant?.[pidB] === match.id
 
+    const canRevert = React.useMemo(
+        () => canRevertMatchLocal(tournament.matches, match.id),
+        [match.id, tournament.matches]
+    )
+
     return (
         <div className={roundNumber != 1 ? 'flex items-center' : ''}
              style={roundNumber !== 1 ? {height: `${2 ** (roundNumber - 1) * cardHeight + (2 ** (roundNumber - 1) - 1) * 12}px`} : undefined}>
             <div
                 ref={cardRef}
-                className={`flex min-w-[160px] flex-col gap-2 rounded-lg border bg-white/5 px-2 py-2 ${match.nextMatchId ? '' : 'border-amber-400'} ${roundNumber !== 1 ? 'w-full' : ''}`}
+                className={`flex min-w-[160px] flex-col gap-2 rounded-lg border bg-white/5 px-2 py-2 ${match.nextMatchId ? '' : isLosers ? 'border-blue-300' : 'border-amber-400'} ${roundNumber !== 1 ? 'w-full' : ''}`}
             >
                 <div className="flex items-center justify-between">
                     {canEdit ? (
@@ -184,24 +222,25 @@ export function MatchCard({
                 </div>
 
                 <div
-                    className={`flex items-center gap-2 rounded-lg bg-white/10 pr-2 text-sm font-medium ${match.isBye ? 'ring-1 ring-blue-400' : winnerSide === 'A' ? (match.nextMatchId ? 'ring-1 ring-emerald-400' : 'ring-1 ring-amber-400') : ''}`}
+                    className={`flex items-center gap-2 rounded-lg bg-white/10 pr-1 sm:pr-2 text-sm font-medium ${match.isBye ? 'ring-1 ring-blue-400' : winnerSide === 'A' ? (match.nextMatchId ? 'ring-1 ring-emerald-400' : isLosers ? 'ring-1 ring-blue-300' : 'ring-1 ring-amber-400') : ''}`}
                 >
                     {isSolo && !decided && canEdit && ((match.participantBId && match.participantAId) || (match.teamBId && match.teamAId)) ? (
                         <Input type="number" min={0} value={scoreA} inputMode="numeric"
                                onChange={(e) => onChangeA(Number(e.target.value))}
-                               className="my-1 ml-2 h-[20px] w-[25px] px-0 py-0 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none"/>
+                               className="my-1 sm:ml-1 h-[20px] w-[20px] px-0 py-0 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none"/>
                     ) : (<span className="flex w-[30px] justify-center rounded-s-lg bg-white/7 py-1">{scoreA}</span>)}
 
-                    <span className="truncate">{nameA}</span>
+                    <span
+                        className={`truncate ${dpA > 0 && isFurthestA && nameA.length > 8 ? 'text-xs' : ''}`}>{nameA}</span>
 
                     {dpA > 0 && isFurthestA && (
                         <span
-                            className="ml-auto rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 text-[10px] font-semibold text-emerald-300">
-    Punkty ×2 • {dpA}
-  </span>
+                            className="ml-auto rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 text-[9px] font-semibold text-emerald-300">
+                        ×2 ({dpA})
+                        </span>
                     )}
 
-                    {winnerSide === 'A' && !match.isBye && (
+                    {winnerSide === 'A' && !match.isBye && canRevert && (
                         <Button className="ml-2" size="icon" variant="destructive" onClick={() => resetMut.mutate()}>
                             <RefreshCw size="16" className={`${resetMut.isPending ? 'animate-spin' : ''}`}/>
                         </Button>
@@ -209,31 +248,30 @@ export function MatchCard({
                 </div>
 
                 <div
-                    className={`flex items-center gap-2 rounded-lg bg-white/10 pr-2 text-sm font-medium ${winnerSide === 'B' ? (match.nextMatchId ? 'ring-1 ring-emerald-400' : 'ring-1 ring-amber-400') : ''}`}
+                    className={`flex items-center gap-2 rounded-lg bg-white/10 pr-1 sm:pr-2 text-sm font-medium ${winnerSide === 'B' ? (match.nextMatchId ? 'ring-1 ring-emerald-400' : isLosers ? 'ring-1 ring-blue-300' : 'ring-1 ring-amber-400') : ''}`}
                 >
                     {isSolo && !decided && canEdit && ((match.participantBId && match.participantAId) || (match.teamBId && match.teamAId)) ? (
                         <Input type="number" min={0} value={scoreB}
                                onChange={(e) => onChangeB(Number(e.target.value))}
-                               className="my-1 ml-2 h-[20px] w-[25px] px-0 py-0 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none"/>
+                               className="my-1 sm:ml-1 h-[20px] w-[20px] px-0 py-0 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none"/>
                     ) : (<span className="flex w-[30px] justify-center rounded-s-lg bg-white/7 py-1">{scoreB}</span>)}
 
-                    <span className="truncate">{nameB}</span>
+                    <span className={`truncate ${dpB > 0 && isFurthestB && nameB.length > 8 ? 'text-xs' : ''}`}>{nameB}</span>
 
                     {dpB > 0 && isFurthestB && (
                         <span
-                            className="ml-auto rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 text-[10px] font-semibold text-emerald-300">
-    Punkty ×2 • {dpB}
-  </span>
+                            className="ml-auto rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 text-[9px] font-semibold text-emerald-300">
+                         ×2 ({dpB})
+                        </span>
                     )}
 
-                    {winnerSide === 'B' && (
+                    {winnerSide === 'B' && canRevert && (
                         <Button className="ml-2" size="icon" variant="destructive" onClick={() => resetMut.mutate()}>
                             <RefreshCw size="16" className={`${resetMut.isPending ? 'animate-spin' : ''}`}/>
                         </Button>
                     )}
                 </div>
 
-                {/* Potwierdzenie */}
                 <Dialog open={confirm.open} onOpenChange={(o) => setConfirm(s => ({...s, open: o}))}>
                     <DialogContent>
                         <DialogHeader>

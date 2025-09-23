@@ -3,8 +3,6 @@ import {Inter} from 'next/font/google'
 import './globals.css'
 import {QueryProvider} from '@/providers/query'
 import React from "react";
-import LogoutButton from "@/components/auth/LogoutButton";
-import {isAdminServer} from '@/lib/session'
 import {Toaster} from "sonner";
 import {NavigationBar} from "@/components/ui/NavigationBar";
 

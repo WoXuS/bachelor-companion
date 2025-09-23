@@ -451,33 +451,36 @@ export async function createSoloTournamentCompact(params: {
     })
 }
 
+function startedLite(m: { isBye: boolean; winnerParticipantId: string|null }) {
+    return !!m.winnerParticipantId || m.isBye
+}
 
 export async function createConsolationBracket(
     tournamentId: string,
     defaultBestOf: 1 | 3 | 5 = 1
 ) {
-    return prisma.$transaction(async (tx) => {
-        const t = await tx.tournament.findUnique({where: {id: tournamentId}})
+    return prisma.$transaction(async (tx: Tx) => {
+        const t = await tx.tournament.findUnique({ where: { id: tournamentId } })
         if (!t) throw new Error('Turniej nie znaleziony')
         if (t.type !== 'SOLO') throw new Error('Drabinka przegranych tylko dla turniejów SOLO')
 
-        const exists = await tx.match.count({where: {tournamentId, bracket: 'LOSERS'}})
+        const exists = await tx.match.count({ where: { tournamentId, bracket: 'LOSERS' } })
         if (exists > 0) throw new Error('Drabinka przegranych już istnieje')
 
         const wins = await tx.match.findMany({
-            where: {tournamentId, bracket: 'WINNERS'},
-            orderBy: [{round: 'asc'}, {indexInRound: 'asc'}],
+            where: { tournamentId, bracket: 'WINNERS' },
+            orderBy: [{ round: 'asc' }, { indexInRound: 'asc' }],
             select: {
                 id: true, round: true, isBye: true,
-                participantAId: true, participantBId: true, winnerParticipantId: true
-            }
+                participantAId: true, participantBId: true, winnerParticipantId: true,
+            },
         })
         if (!wins.length) throw new Error('Brak meczów w drabince wygranych')
 
         const byRound = new Map<number, typeof wins>()
         for (const m of wins) {
             const arr = byRound.get(m.round) ?? []
-            arr.push(m);
+            arr.push(m)
             byRound.set(m.round, arr)
         }
 
@@ -486,15 +489,11 @@ export async function createConsolationBracket(
 
         let firstNoByeRound: number | null = null
         for (const [r, ms] of [...byRound.entries()].sort((a, b) => a[0] - b[0])) {
-            if (!ms.some(m => m.isBye)) {
-                firstNoByeRound = r;
-                break
-            }
+            if (!ms.some(m => m.isBye)) { firstNoByeRound = r; break }
         }
         if (!firstNoByeRound) throw new Error('Nie znaleziono rundy drabinki wygranych bez auto-awansów')
 
         const winnersMain = byRound.get(firstNoByeRound)!
-
         if (!winnersMain.every(m => m.winnerParticipantId)) {
             throw new Error(`Najpierw zakończ wszystkie mecze w rundzie ${firstNoByeRound} (WINNERS)`)
         }
@@ -505,113 +504,104 @@ export async function createConsolationBracket(
             if (!A || !B || !W) return
             losers.push(W === A ? B : A)
         }
-        for (const m of winnersR0) if (!m.isBye && m.winnerParticipantId) pushLoser(m)
+        for (const m of winnersR0) if (!m.isBye && startedLite(m)) pushLoser(m)
         for (const m of winnersMain) pushLoser(m)
 
         const uniqLosers = Array.from(new Set(losers))
         if (uniqLosers.length < 2) throw new Error('Za mało przegranych do wygenerowania drabinki')
 
         const seeds = await tx.participant.findMany({
-            where: {id: {in: uniqLosers}},
-            select: {id: true, balance: true},
-            orderBy: {balance: 'desc'},
+            where: { id: { in: uniqLosers } },
+            select: { id: true, balance: true },
+            orderBy: { balance: 'desc' },
         })
-        const seeded = seeds.map(s => s.id)
+        const seeded = seeds.map(s => s.id) // najlepszy balans = wyżej seed
 
         const L = seeded.length
         const pow2Down = 1 << Math.floor(Math.log2(L))
-        const playInPairs = L - pow2Down
-        const l0Pool = playInPairs > 0 ? seeded.slice(-2 * playInPairs) : []
-        const fixedL1 = playInPairs > 0 ? seeded.slice(0, seeded.length - l0Pool.length) : seeded.slice()
+        const hasPlayIn = L !== pow2Down
+        const playInPairs = L - pow2Down // liczba par w L0
+
+        const l0Pool = hasPlayIn ? seeded.slice(-2 * playInPairs) : []
+        const fixedL1 = hasPlayIn ? seeded.slice(0, seeded.length - l0Pool.length) : seeded.slice()
+
+        async function createRound(
+            roundNo: number,
+            entrants: Entrant[],
+            opts: { bracket: 'LOSERS'; isPlayIn: boolean; bestOf: 1|3|5 }
+        ) {
+            if (entrants.length % 2 !== 0) throw new Error(`Niezgodna liczba slotów w rundzie ${roundNo}`)
+            const ids: string[] = []
+            const newMatches: { id: string }[] = []
+
+            for (let i = 0; i < entrants.length; i += 2) {
+                const A = entrants[i], B = entrants[i + 1]
+                const pidA = A.kind === 'player' ? A.id : null
+                const pidB = B.kind === 'player' ? B.id : null
+
+                const m = await tx.match.create({
+                    data: {
+                        tournamentId,
+                        bracket: opts.bracket,
+                        round: roundNo,
+                        indexInRound: ids.length,
+                        participantAId: pidA,
+                        participantBId: pidB,
+                        isBye: false,
+                        isPlayIn: opts.isPlayIn,
+                        bestOf: opts.bestOf,
+                    },
+                    select: { id: true },
+                })
+                ids.push(m.id)
+                newMatches.push(m)
+
+                if (A.kind === 'fromMatch') {
+                    await tx.match.update({ where: { id: A.matchId }, data: { nextMatchId: m.id, nextMatchSlot: 'A' } })
+                }
+                if (B.kind === 'fromMatch') {
+                    await tx.match.update({ where: { id: B.matchId }, data: { nextMatchId: m.id, nextMatchSlot: 'B' } })
+                }
+            }
+
+            return ids
+        }
 
         const createdByRound: string[][] = []
-        let roundOffset = 0
+        let roundNo = 1
 
-        if (playInPairs > 0) {
-            const ids: string[] = []
+        if (hasPlayIn) {
+            const entrantsL0: Entrant[] = []
             for (let i = 0; i < l0Pool.length; i += 2) {
                 const a = l0Pool[i], b = l0Pool[i + 1]
                 if (!a || !b) throw new Error('Nieprawidłowa liczba graczy w L0')
-                const m = await tx.match.create({
-                    data: {
-                        tournamentId, bracket: 'LOSERS',
-                        round: 1, indexInRound: ids.length,
-                        participantAId: a, participantBId: b,
-                        isBye: false, isPlayIn: true,
-                        bestOf: defaultBestOf,
-                    }
-                })
-                ids.push(m.id)
+                entrantsL0.push({ kind: 'player', id: a }, { kind: 'player', id: b })
             }
-            createdByRound.push(ids)
-            roundOffset = 1
+            const l0Ids = await createRound(roundNo, entrantsL0, { bracket: 'LOSERS', isPlayIn: true, bestOf: defaultBestOf })
+            createdByRound.push(l0Ids)
+            roundNo++
         }
 
-        const winnersFromL0 = playInPairs > 0
-            ? createdByRound[0].map(id => ({kind: 'fromMatch' as const, matchId: id}))
-            : []
-
-        const slotsL1: Array<
-            | { kind: 'player', id: string }
-            | { kind: 'fromMatch', matchId: string }
-        > = []
+        const winnersFromL0: Entrant[] = hasPlayIn ? createdByRound[0].map(id => ({ kind: 'fromMatch', matchId: id })) : []
+        const slotsL1: Entrant[] = []
 
         const k = Math.min(fixedL1.length, winnersFromL0.length)
-        for (let i = 0; i < k; i++) slotsL1.push({kind: 'player', id: fixedL1[i]}, winnersFromL0[i])
-        for (let i = k; i < fixedL1.length; i++) slotsL1.push({kind: 'player', id: fixedL1[i]})
+        for (let i = 0; i < k; i++) slotsL1.push({ kind: 'player', id: fixedL1[i] }, winnersFromL0[i])
+        for (let i = k; i < fixedL1.length; i++) slotsL1.push({ kind: 'player', id: fixedL1[i] })
         for (let i = k; i < winnersFromL0.length; i++) slotsL1.push(winnersFromL0[i])
 
-        if (slotsL1.length % 2 !== 0) {
-            throw new Error('Niezgodna liczba graczy w L1 (nieparzysta)')
-        }
+        if (slotsL1.length % 2 !== 0) throw new Error('Niezgodna liczba graczy w L1 (nieparzysta)')
 
-        const l1Ids: string[] = []
-        for (let i = 0; i < slotsL1.length; i += 2) {
-            const A = slotsL1[i], B = slotsL1[i + 1]
-            const pidA = A.kind === 'player' ? A.id : null
-            const pidB = B.kind === 'player' ? B.id : null
-            const m = await tx.match.create({
-                data: {
-                    tournamentId, bracket: 'LOSERS',
-                    round: 1 + roundOffset, indexInRound: l1Ids.length,
-                    participantAId: pidA, participantBId: pidB,
-                    isBye: false, isPlayIn: false,
-                    bestOf: defaultBestOf
-                }
-            })
-            l1Ids.push(m.id)
-            if (A.kind === 'fromMatch') {
-                await tx.match.update({where: {id: A.matchId}, data: {nextMatchId: m.id, nextMatchSlot: 'A'}})
-            }
-            if (B.kind === 'fromMatch') {
-                await tx.match.update({where: {id: B.matchId}, data: {nextMatchId: m.id, nextMatchSlot: 'B'}})
-            }
-        }
+        const l1Ids = await createRound(roundNo, slotsL1, { bracket: 'LOSERS', isPlayIn: false, bestOf: defaultBestOf })
         createdByRound.push(l1Ids)
+        roundNo++
 
         while (createdByRound[createdByRound.length - 1].length > 1) {
             const prev = createdByRound[createdByRound.length - 1]
-            const cur: string[] = []
-            const newRoundNumber = createdByRound.length + roundOffset
-
-            for (let i = 0; i < prev.length / 2; i++) {
-                const m = await tx.match.create({
-                    data: {
-                        tournamentId, bracket: 'LOSERS',
-                        round: newRoundNumber, indexInRound: i,
-                        isBye: false, isPlayIn: false, bestOf: defaultBestOf
-                    }
-                })
-                cur.push(m.id)
-            }
-
-            for (let i = 0; i < prev.length; i++) {
-                const target = cur[Math.floor(i / 2)]
-                const slot = i % 2 === 0 ? 'A' : 'B'
-                await tx.match.update({where: {id: prev[i]}, data: {nextMatchId: target, nextMatchSlot: slot}})
-            }
-
-            createdByRound.push(cur)
+            const entrantsNext: Entrant[] = prev.map(id => ({ kind: 'fromMatch', matchId: id }))
+            const nextIds = await createRound(roundNo, entrantsNext, { bracket: 'LOSERS', isPlayIn: false, bestOf: defaultBestOf })
+            createdByRound.push(nextIds)
+            roundNo++
         }
 
         return true

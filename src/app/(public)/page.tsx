@@ -12,7 +12,7 @@ import {ParticipantDto} from "@/types/participant"
 import {ShopItemDto} from "@/types/shop-item"
 import {toast} from "sonner"
 import {CustomLoader} from "@/components/ui/CustomLoader"
-import {Cog} from "lucide-react"
+import {Cog, UserRoundPlus} from "lucide-react"
 
 /** ---------- Types & helpers ---------- */
 
@@ -171,7 +171,6 @@ export default function HomePage() {
         </span>
             )
         }
-        // Pokazuj realny procent w configu (UI nie zgaduje z itemów)
         return (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
         Obniżka −{cfg.discountPercent}%
@@ -199,12 +198,19 @@ export default function HomePage() {
                     return (
                         <li
                             key={item.id}
-                            className="group flex items-center justify-between rounded-lg border border-slate-700/60 bg-gradient-to-br from-slate-900/60 to-slate-900/30 p-3 shadow-sm transition hover:border-slate-500/50 hover:shadow"
+                            className="group flex items-stretch gap-2 justify-between rounded-lg border border-slate-700/60 bg-gradient-to-br from-slate-900/60 to-slate-900/30 pl-3 shadow-sm transition hover:border-slate-500/50 hover:shadow"
                         >
-                            <div className="flex min-w-0 flex-col gap-1">
-                                <div className="truncate text-sm font-medium text-slate-100">{item.label}</div>
+                            <div className="flex min-w-0 flex-col gap-2 py-3">
+                                <div className="text-sm font-medium text-slate-100">
+                                    <p>
+                                        {item.label}{" "}{" "}
+                                        <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase ${item.category !== 'troll' ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'} `}>
+                                            {item.category}
+                                    </span>
+                                    </p>
 
-                                {/* Price line */}
+                                </div>
+
                                 <div className="flex items-center gap-2">
                                     {state.kind === 'discount' && (
                                         <>
@@ -239,7 +245,7 @@ export default function HomePage() {
                                     )}
 
                                     {state.kind === 'normal' && (
-                                        <span className="text-sm font-semibold text-slate-200">
+                                        <span className="text-sm font-semibold text-primary">
                       {item.cost} $pruch
                     </span>
                                     )}
@@ -247,7 +253,7 @@ export default function HomePage() {
                             </div>
 
                             {isAdmin && (
-                                <div className="flex shrink-0 gap-1">
+                                <div className="flex items-stretch">
                                     <AddEditItemDialog
                                         onSave={(d) => save.mutate(d)}
                                         shopItem={item}
@@ -320,7 +326,7 @@ function PurchaseDialog({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" variant="secondary">Kup dla</Button>
+                <Button size="sm" className="h-full rounded-none rounded-e-lg"><UserRoundPlus /></Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
@@ -401,7 +407,7 @@ function AddEditItemDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
-                <Button size="sm" variant={shopItem ? 'secondary' : 'default'} className={shopItem ? '' : 'w-full'}>
+                <Button size="sm" variant={shopItem ? 'secondary' : 'default'} className={shopItem ? 'h-full rounded-none' : 'w-full'}>
                     {shopItem ? <Cog/> : '+'}
                 </Button>
             </DialogTrigger>
@@ -434,7 +440,7 @@ function AddEditItemDialog({
                             <SelectValue placeholder="Wybierz kategorię"/>
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value='trolling'>Trolling</SelectItem>
+                            <SelectItem value='troll'>Przeszkadzanie</SelectItem>
                             <SelectItem value='buff'>Buff</SelectItem>
                             <SelectItem value='immunitet'>Immunitet</SelectItem>
                             <SelectItem value='fun'>Fun</SelectItem>

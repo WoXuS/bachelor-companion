@@ -20,7 +20,7 @@ import {ParticipantDto} from "@/types/participant";
 import {CustomLoader} from "@/components/ui/CustomLoader";
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
-
+import {RefreshCw, Trash2} from "lucide-react"
 
 async function fetchTransactions(participantId?: string, order: 'asc' | 'desc' = 'desc'): Promise<TransactionDto[]> {
     const q = new URLSearchParams()
@@ -39,6 +39,13 @@ async function revertTransaction(id: string) {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data?.message || 'Failed to revert')
     return data
+}
+
+async function deleteTransaction(transactionId: string) {
+    const r = await fetch(`/api/transactions/${transactionId}`, {method: 'DELETE'})
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j?.message || 'Delete failed')
+    return j
 }
 
 async function fetchParticipants(): Promise<ParticipantDto[]> {
@@ -79,6 +86,17 @@ export default function TransactionsClient({
             qc.invalidateQueries({queryKey: ['ranking']})
         },
         onError: (e: any) => toast.error(`Błąd: ${e.message}`),
+    })
+
+    const deleteMut = useMutation({
+        mutationFn: deleteTransaction,
+        onSuccess: () => {
+            toast.success('Usunięto transakcję.')
+            qc.invalidateQueries({queryKey: ['transactions']})
+            qc.invalidateQueries({queryKey: ['participants']})
+            qc.invalidateQueries({queryKey: ['ranking']})
+        },
+        onError: (e: any) => toast.error(e.message),
     })
 
 
@@ -134,8 +152,9 @@ export default function TransactionsClient({
                 {txs.length ? txs.map((t) => {
                     const predicted = t.participant.balance - t.amount
                     const wouldBeNegative = predicted < 0
+                    const isRevert = t.reason.includes('REVERT')
                     return (
-                        <li key={t.id} className="flex justify-between items-center py-3">
+                        <li key={t.id} className="flex justify-between items-stretch py-3">
                             <div className="flex flex-col gap-2">
                                 <div className="font-medium">{t.reason}</div>
                                 <div className="text-sm text-gray-400">
@@ -145,7 +164,7 @@ export default function TransactionsClient({
                                             variant="link"
                                             size="sm"
                                             onClick={() => router.push(`/transactions/${t.participant.id}`)}
-                                            className="p-0"
+                                            className="p-0 text-primary"
                                         >
                                             {t.participant.name}
                                         </Button>
@@ -160,7 +179,7 @@ export default function TransactionsClient({
                                         ) : (
                                             // wysyłający
                                             <p className="text-xs">
-                                                <span className=" text-red-400">{t.participant.name}</span> → <span
+                                                <span className="text-red-400">{t.participant.name}</span> → <span
                                                 className="text-green-400">{t.counterparty.name} </span>
                                             </p>
                                         )
@@ -179,17 +198,30 @@ export default function TransactionsClient({
                                 </div>
                             </div>
                             {isAdmin && (
-                                <Button
-                                    variant={`${wouldBeNegative ? 'outline' : 'destructive'}`}
-                                    size="sm"
-                                    className={`${wouldBeNegative && 'opacity-40'}`}
-                                    onClick={() => {
-                                        wouldBeNegative ? toast.error('Cofnięcie obniżyłoby saldo poniżej zera') : revertMut.mutate(t.id)
-                                    }}
-                                    title={wouldBeNegative ? 'Cofnięcie obniżyłoby saldo poniżej zera' : 'Cofnij transakcję'}
-                                >
-                                    Cofnij
-                                </Button>
+                                <div className="flex items-stretch">
+                                    {!isRevert && (<Button
+                                        variant={`${wouldBeNegative ? 'outline' : 'secondary'}`}
+                                        size="sm"
+                                        className={`h-full rounded-none ${wouldBeNegative && 'opacity-40'}`}
+                                        onClick={() => {
+                                            wouldBeNegative ? toast.error('Cofnięcie obniżyłoby saldo poniżej zera') : revertMut.mutate(t.id)
+                                        }}
+                                        title={wouldBeNegative ? 'Cofnięcie obniżyłoby saldo poniżej zera' : 'Cofnij transakcję'}
+                                    >
+                                        <RefreshCw className={`${revertMut.isPending ? 'animate-spin' : ''}`}/>
+                                    </Button>)}
+                                    <Button
+                                        variant={`${wouldBeNegative ? 'outline' : 'destructive'}`}
+                                        size="sm"
+                                        className={`h-full ${!isRevert ? 'rounded-none rounded-e-lg' : ''} ${wouldBeNegative && 'opacity-40'}`}
+                                        onClick={() => {
+                                            wouldBeNegative ? toast.error('usunięcie obniżyłoby saldo poniżej zera') : deleteMut.mutate(t.id)
+                                        }}
+                                        title={wouldBeNegative ? 'Usunięcie obniżyłoby saldo poniżej zera' : 'Usuń transakcję'}
+                                    >
+                                        <Trash2 className={`${deleteMut.isPending ? 'animate-bounce' : ''}`}/>
+                                    </Button>
+                                </div>
                             )}
                         </li>)
                 }) : <div className="text-destructive">Brak transakcji.</div>}

@@ -92,6 +92,7 @@ export async function getTournament(id: string): Promise<TTournament | null> {
         })),
         matches: t.matches.map(m => ({
             id: m.id,
+            tournamentId:m.tournamentId,
             round: m.round,
             indexInRound: m.indexInRound,
             participantAId: m.participantAId ?? undefined,

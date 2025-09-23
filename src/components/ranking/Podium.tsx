@@ -5,18 +5,13 @@ import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {useState} from 'react'
-import { Receipt } from 'lucide-react';
+import {Receipt} from 'lucide-react';
+import {ParticipantDto} from "@/types/participant";
 
-type Participant = {
-    id: string
-    name: string
-    balance: number
-    avatarUrl: string | null
-}
 
-export function Podium({top3, onSubmit, isAdmin}: {
-    top3: Participant[]
-    onSubmit: (payload: { id: string; amount: number; reason: string }) => void
+export function Podium({top3, onSubmitAction, isAdmin}: {
+    top3: ParticipantDto[]
+    onSubmitAction: (payload: { id: string; amount: number; reason: string }) => void
     isAdmin: boolean
 }) {
     const [first, second, third] = [top3[0], top3[1], top3[2]].filter(Boolean)
@@ -24,9 +19,11 @@ export function Podium({top3, onSubmit, isAdmin}: {
     return (
         <div className="w-full">
             <div className="flex items-end justify-center gap-2">
-                {second && <PodiumColumn place={2} p={second} onSubmit={onSubmit} heightClass="mb-2" isAdmin={isAdmin}/>}
-                {first && <PodiumColumn place={1} p={first} onSubmit={onSubmit} heightClass="mb-5" isAdmin={isAdmin}/>}
-                {third && <PodiumColumn place={3} p={third} onSubmit={onSubmit} isAdmin={isAdmin}/>}
+                {second && <PodiumColumn place={2} p={second} onSubmitAction={onSubmitAction} heightClass="mb-2"
+                                         isAdmin={isAdmin}/>}
+                {first && <PodiumColumn place={1} p={first} onSubmitAction={onSubmitAction} heightClass="mb-5"
+                                        isAdmin={isAdmin}/>}
+                {third && <PodiumColumn place={3} p={third} onSubmitAction={onSubmitAction} isAdmin={isAdmin}/>}
             </div>
 
         </div>
@@ -36,13 +33,13 @@ export function Podium({top3, onSubmit, isAdmin}: {
 function PodiumColumn({
                           place,
                           p,
-                          onSubmit,
+                          onSubmitAction,
                           heightClass,
                           isAdmin
                       }: {
     place: 1 | 2 | 3
-    p: Participant
-    onSubmit: (payload: { id: string; amount: number; reason: string }) => void
+    p: ParticipantDto
+    onSubmitAction: (payload: { id: string; amount: number; reason: string }) => void
     heightClass?: string
     isAdmin: boolean
 }) {
@@ -70,6 +67,13 @@ function PodiumColumn({
                     height={124}
                     className="absolute bottom-0 right-1 max-w-[25px]" aria-hidden="true"
                 />
+                {p.buffs?.map(buff => (
+                    buff.type === "DOUBLE_POINTS" && buff.remainingMatches > 0 &&
+                    <span key={buff.id}
+                          className="absolute bottom-0 transform-[translate(-50%) rounded-full border border-emerald-500/40 bg-emerald-500/60 px-1.5 text-[10px] font-semibold text-emerald-300">
+                                        2x ({buff.remainingMatches})
+                    </span>
+                ))}
             </div>
 
             <div
@@ -78,14 +82,14 @@ function PodiumColumn({
                 <div className="flex flex-col gap-2 items-center sm:w-[50%] w-[65%]">
                     <h3 className="text-md sm:text-xl font-bold whitespace-nowrap">{p.name}</h3>
                     <div
-                        className="bg-primary-foreground/70 font-bold rounded-md px-5 sm:px-4 text-md sm:text-xl flex items-center justify-center gap-[3px]">
+                        className="bg-primary-foreground/70 font-bold rounded-md px-4 text-md sm:text-xl flex items-center justify-center gap-[3px]">
                         <Receipt size="16"/>
                         {p.balance}
                     </div>
                 </div>
                 {isAdmin && (
                     <div className="absolute right-[50%] transform-[translateX(50%)] -bottom-3">
-                        <AddPointsDialog participantId={p.id} onSubmit={onSubmit}/>
+                        <AddPointsDialog participantId={p.id} onSubmitAction={onSubmitAction}/>
                     </div>)
                 }
             </div>
@@ -95,10 +99,10 @@ function PodiumColumn({
 
 function AddPointsDialog({
                              participantId,
-                             onSubmit,
+                             onSubmitAction,
                          }: {
     participantId: string
-    onSubmit: (payload: { id: string; amount: number; reason: string }) => void
+    onSubmitAction: (payload: { id: string; amount: number; reason: string }) => void
 }) {
     const [amount, setAmount] = useState(1)
     const [reason, setReason] = useState('')
@@ -131,7 +135,7 @@ function AddPointsDialog({
                     />
                     <Button
                         onClick={() => {
-                            onSubmit({id: participantId, amount, reason: reason || 'Brak powodu'})
+                            onSubmitAction({id: participantId, amount, reason: reason || 'Brak powodu'})
                         }}
                     >
                         Submit

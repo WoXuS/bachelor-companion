@@ -7,6 +7,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum EasterEggType {
+  PHYSICAL
+  VIRTUAL
+}
+
+model EasterEgg {
+  id        String        @id @default(cuid())
+  number    Int           @unique
+  type      EasterEggType
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+
+  claimedById String?
+  claimedBy   Participant? @relation(fields: [claimedById], references: [id])
+  claimedAt   DateTime?
+
+  label String?
+}
+
 model Participant {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -23,12 +42,13 @@ model Participant {
 
   TournamentTeamMember TournamentTeamMember[]
 
-  duelsAsA               Duel[]               @relation("DuelPlayerA")
-  duelsAsB               Duel[]               @relation("DuelPlayerB")
-  duelsWon               Duel[]               @relation("DuelWinner")
-  Duel                   Duel[]
-  buffs                  ParticipantBuff[]
-  buffUsage              ParticipantBuffUsage[]
+  duelsAsA          Duel[]                 @relation("DuelPlayerA")
+  duelsAsB          Duel[]                 @relation("DuelPlayerB")
+  duelsWon          Duel[]                 @relation("DuelWinner")
+  Duel              Duel[]
+  claimedEasterEggs EasterEgg[]
+  buffs             ParticipantBuff[]
+  buffUsage         ParticipantBuffUsage[]
 }
 
 model Transaction {
