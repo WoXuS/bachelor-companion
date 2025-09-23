@@ -17,7 +17,7 @@ export function middleware(req: NextRequest) {
     }
 
     const isAdminRoute = pathname.startsWith('/admin')
-    const isMutationApi = pathname.startsWith('/api') && req.method !== 'GET'
+    const isMutationApi = pathname.startsWith('/api') && req.method !== 'GET' && (!pathname.includes('claim') && !pathname.includes('easter-eggs'))
 
     if ((isAdminRoute || isMutationApi) && !isAdminServer()) {
         if (isAdminRoute) {

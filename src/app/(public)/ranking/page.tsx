@@ -11,6 +11,9 @@ import {ParticipantDto} from "@/types/participant";
 import {getAdmin} from "@/hooks/useAdmin";
 import {Receipt} from "lucide-react";
 import Link from "next/link";
+import {toast} from "sonner";
+import {NextResponse} from "next/server";
+import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
 
 async function fetchRanking(): Promise<ParticipantDto[]> {
     const res = await fetch('/api/ranking')
@@ -19,13 +22,16 @@ async function fetchRanking(): Promise<ParticipantDto[]> {
 }
 
 async function addTransaction(id: string, amount: number, reason: string) {
+
     const res = await fetch(`/api/participants/${id}/transactions`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({amount, reason}),
+
     })
-    if (!res.ok) throw new Error('Failed to add transaction')
-    return res.json()
+    const d = await res.json()
+    if (!res.ok) throw new Error(d?.message || 'Load failed')
+    return d
 }
 
 export default function RankingPage() {
@@ -39,8 +45,12 @@ export default function RankingPage() {
         mutationFn: ({id, amount, reason}: { id: string; amount: number; reason: string }) =>
             addTransaction(id, amount, reason),
         onSuccess: () => {
+            toast.success('Pomyślnie edytowane punkty.')
             queryClient.invalidateQueries({queryKey: ['ranking']})
         },
+        onError: (e) => {
+            toast.error(e.message)
+        }
     })
 
     const podium = ranking.slice(0, 3)
@@ -67,7 +77,7 @@ export default function RankingPage() {
                         key={p.id}
                         className="flex items-center justify-between rounded-md shadow-sm bg-gradient-to-br from-slate-900/60 to-slate-900/30"
                     >
-                        <Link href={`/transactions/${p.id}`} className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 relative">
                             <p className="bg-primary-foreground rounded-e-4xl rounded-s-[9%] py-3 w-10 sm:w-15 h-[76px] flex items-center justify-center">{idx + 4}</p>
 
                             <Image
@@ -77,7 +87,14 @@ export default function RankingPage() {
                                 height={60}
                                 className="rounded-full py-2 "
                             />
-
+                            {p.name === "Antoni" &&
+                                <VirtualEggButton placementKey="ranking-first"
+                                                  className="absolute right-[47%] top-[60%] transform-[translate(-50%,-50%)] z-20 opacity-50"/>
+                            }
+                            {p.name === "Borys" &&
+                                <VirtualEggButton placementKey="ranking-last"
+                                                  className="absolute right-[40%] top-[50%] transform-[translate(-50%,-50%)] z-20 opacity-50"/>
+                            }
                             <p className="flex flex-col gap-0.5">
                                 <span className="font-medium">{p.name}</span>
                                 {p.buffs?.map(buff => (
@@ -90,17 +107,17 @@ export default function RankingPage() {
                             </p>
 
 
-                        </Link>
-                        <div className="flex items-center gap-2 pr-3">
+                        </div>
+                        <Link href={`/transactions/${p.id}`} className="flex items-center gap-2 pr-3">
                             <div
                                 className={`bg-primary-foreground/70 rounded-md px-3  ${p.balance > 999 ? 'text-sm py-2' : 'text-md py-1'} font-bold flex gap-[5px] items-center`}>
                                 <p>{p.balance}</p>
                                 <Receipt size="20"/>
                             </div>
-                            {isAdmin && (
+                            {isAdmin &&
                                 <AddPointsDialog participantId={p.id} mutate={mutation.mutate}/>
-                            )}
-                        </div>
+                            }
+                        </Link>
                     </li>
                 ))}
             </ul>

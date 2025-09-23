@@ -1,3 +1,6 @@
+import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
+import React from "react";
+
 export default function HowToEarnPage() {
     return (
         <div className="max-w-4xl mx-auto p-6 space-y-6 pt-20">
@@ -57,6 +60,8 @@ export default function HowToEarnPage() {
                         className="text-xs">$pruch</span></span></p>
                 </li>
             </ul>
+            <VirtualEggButton placementKey="how-to-earn" className="mt-500"/>
+
         </div>
     )
 }

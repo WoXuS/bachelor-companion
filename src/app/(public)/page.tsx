@@ -13,8 +13,7 @@ import {ShopItemDto} from "@/types/shop-item"
 import {toast} from "sonner"
 import {CustomLoader} from "@/components/ui/CustomLoader"
 import {Cog, UserRoundPlus} from "lucide-react"
-
-/** ---------- Types & helpers ---------- */
+import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
 
 type ShopItemView = ShopItemDto & {
     effectiveCost?: number
@@ -37,8 +36,6 @@ function prettyDeltaPercent(base: number, effective: number) {
     const pct = Math.round(((effective - base) / base) * 100)
     return (pct > 0 ? `+${pct}%` : `${pct}%`)
 }
-
-/** ---------- Data fetching ---------- */
 
 async function fetchShop(): Promise<ShopItemView[]> {
     const res = await fetch('/api/shop', {cache: 'no-store'})
@@ -116,8 +113,6 @@ async function updateShopConfig(patch: Partial<ShopConfig>) {
     return r.json()
 }
 
-/** ---------- Page ---------- */
-
 export default function HomePage() {
     const {data: me} = useQuery({queryKey: ['me'], queryFn: getAdmin, staleTime: 30_000})
     const isAdmin = !!me?.isAdmin
@@ -186,7 +181,6 @@ export default function HomePage() {
                 <h1 className="text-2xl font-bold">Cennik</h1>
                 {headerBadge}
             </div>
-
             {isAdmin && <AdminShopControls/>}
 
             <ul className="space-y-3">
@@ -297,11 +291,10 @@ export default function HomePage() {
                     .
                 </p>
             </section>
+            <VirtualEggButton placementKey="shop" className="mt-500 ml-auto"/>
         </div>
     )
 }
-
-/** ---------- Dialogs ---------- */
 
 function PurchaseDialog({
                             item,
@@ -480,8 +473,6 @@ function AddEditItemDialog({
         </Dialog>
     )
 }
-
-/** ---------- Admin Controls ---------- */
 
 function AdminShopControls() {
     const qc = useQueryClient()

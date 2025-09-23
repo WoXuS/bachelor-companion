@@ -7,7 +7,7 @@ export async function GET() {
         include: { claimedBy: { select: { id: true, name: true } } },
     })
     return NextResponse.json(eggs.map(e => ({
-        id: e.id, number: e.number, type: e.type, active: e.active,
+        id: e.id, number: e.number, type: e.type, active: e.active, placementKey: e.placementKey ?? null,
         claimedAt: e.claimedAt, claimedBy: e.claimedBy, label: e.label ?? null,
     })))
 }

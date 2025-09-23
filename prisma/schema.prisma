@@ -7,6 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum QuizKind {
+  GROOM
+  AUDIENCE
+}
+
+model QuizQuestion {
+  id           String    @id @default(cuid())
+  kind         QuizKind
+  number       Int
+  text         String
+  audioUrl     String?
+  active       Boolean   @default(true)
+
+  answeredAt             DateTime?
+  groomCorrect           Boolean?
+  awardedParticipantId   String?
+  awardedParticipant     Participant? @relation(fields: [awardedParticipantId], references: [id])
+
+  createdAt    DateTime  @default(now())
+
+  @@unique([kind, number])
+}
+
+model QuizMeta {
+  id                       String   @id @default("singleton")
+  audienceBonusGranted     Boolean  @default(false)
+}
+
 enum EasterEggType {
   PHYSICAL
   VIRTUAL
@@ -24,6 +52,9 @@ model EasterEgg {
   claimedAt   DateTime?
 
   label String?
+
+  code         String  @unique
+  placementKey String? @unique
 }
 
 model Participant {
@@ -49,6 +80,8 @@ model Participant {
   claimedEasterEggs EasterEgg[]
   buffs             ParticipantBuff[]
   buffUsage         ParticipantBuffUsage[]
+
+  correctQuizQuestions QuizQuestion[]
 }
 
 model Transaction {
@@ -229,4 +262,7 @@ model ShopConfig {
   discountPercent  Int      @default(20)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  groomParticipantId String?
+  audienceExcludeIds Json?
 }

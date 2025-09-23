@@ -15,6 +15,7 @@ import {NewDuelDialog, NewTournamentDialog} from "./components/CreateNewDialogs"
 import {ChevronRight, Crown, Trash2} from "lucide-react";
 import {EditDuelDialog} from "@/app/(public)/tournaments/components/EditDuelDialog";
 import * as React from "react";
+import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
 
 async function fetchTournaments(): Promise<TournamentListItemDto[]> {
     const res = await fetch('/api/tournaments')
@@ -157,7 +158,7 @@ export default function TournamentsPage() {
                 ) : <p className="text-destructive">Brak turniejów do wyświetlenia.</p>
             ) : (
                 duels.length ? (
-                    <ul className="space-y-3">
+                    <ul className="space-y-3 relative">
                         {duels.map((d) => (
                             <li key={d.id}
                                 className="flex items-stretch justify-between rounded-lg border pl-3 bg-white/5">
@@ -197,6 +198,7 @@ export default function TournamentsPage() {
                                 </div>
                             </li>
                         ))}
+                        <VirtualEggButton placementKey="duels" className="fixed z-20 -bottom-2 -right-3"/>
                     </ul>
                 ) : <p className="text-destructive">Brak pojedynków do wyświetlenia.</p>
             )}

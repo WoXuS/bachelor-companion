@@ -20,6 +20,7 @@ import {reseedRound1} from '@/server/db/services/tournaments.service'
 import {getAdmin} from '@/hooks/useAdmin'
 import {CustomLoader} from '@/components/ui/CustomLoader'
 import TeamVersusCardRow from "@/app/(public)/tournaments/[id]/components/TeamVersusCardRow";
+import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
 
 async function fetchTournament(id: string): Promise<TTournament & any> {
     const res = await fetch(`/api/tournaments/${id}`)
@@ -112,7 +113,7 @@ export default function TournamentDetailPage() {
     return (
         <div className={`max-w-5xl mx-auto pb-6 px-4 sm:px-6 ${isSolo ? 'space-y-6' : 'space-y-1'} pt-20`}>
             <header className="flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-2xl font-bold">Turniej: {tournament.title}</h1>
+                <h1 className="text-2xl font-bold">Turniej: {tournament.title}, <span className="text-base text-gray-400">drabinka {tab === 'WINNERS' ? 'wygranych' : 'przegranych'}</span></h1>
                 <div className="flex flex-wrap items-center gap-2">
                     {isSolo && (
                         <Button onClick={() => setTab(tab === 'WINNERS' ? 'LOSERS' : 'WINNERS')}>
@@ -166,6 +167,7 @@ export default function TournamentDetailPage() {
                         liczba graczy
                         nie jest potęgą 2, zostanie rozegrany play-in (runda kwalifikacyjna drabinki przegranych).
                     </p>
+                    <VirtualEggButton placementKey="losers" className="fixed z-20 -bottom-1 -left-3"/>
                 </>
             ) : (
                 <div className={isSolo ? "overflow-auto" : ''}>
@@ -208,6 +210,7 @@ export default function TournamentDetailPage() {
                             </div>
                         ))}
                     </div>
+                    <VirtualEggButton placementKey="losers" className="mt-5"/>
                 </div>
             )}
         </div>

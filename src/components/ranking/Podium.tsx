@@ -7,6 +7,7 @@ import {Input} from '@/components/ui/input'
 import {useState} from 'react'
 import {Receipt} from 'lucide-react';
 import {ParticipantDto} from "@/types/participant";
+import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
 
 
 export function Podium({top3, onSubmitAction, isAdmin}: {
@@ -67,6 +68,14 @@ function PodiumColumn({
                     height={124}
                     className="absolute bottom-0 right-1 max-w-[25px]" aria-hidden="true"
                 />
+                {p.name === "Antoni" &&
+                    <VirtualEggButton placementKey="ranking-first"
+                                      className="absolute right-[30%] top-[70%] transform-[translate(-50%,-50%)] z-20 opacity-60"/>
+                }
+                {p.name === "Borys" &&
+                    <VirtualEggButton placementKey="ranking-last"
+                                      className="absolute right-[50%] top-[50%] transform-[translate(-50%,-50%)] z-20 opacity-60"/>
+                }
                 {p.buffs?.map(buff => (
                     buff.type === "DOUBLE_POINTS" && buff.remainingMatches > 0 &&
                     <span key={buff.id}

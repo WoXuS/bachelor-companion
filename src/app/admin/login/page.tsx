@@ -1,6 +1,8 @@
 import {redirect} from 'next/navigation'
 import LoginForm from '@/components/auth/LoginForm'
 import {isAdminServer} from '@/lib/session'
+import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
+import React from "react";
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +17,10 @@ export default function AdminLoginPage() {
                 <h1 className="text-xl font-semibold mb-2">Admin login</h1>
                 <p className="text-sm text-white/70 mb-6">Wpisz hasło admina, by wejść do panelu.</p>
                 <LoginForm/>
+                <VirtualEggButton placementKey="admin-page" className="mx-auto mt-5"/>
             </div>
+            <VirtualEggButton placementKey="admin-page-2" className="ml-300 absolute bottom-0 "/>
+
         </div>
     )
 }

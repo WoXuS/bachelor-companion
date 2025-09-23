@@ -2,40 +2,88 @@ import {PrismaClient} from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-async function seedEasterEggs({ physical = 12, virtual = 8 }: { physical?: number; virtual?: number }) {
-    const toCreate = []
-    let n = 1
-    for (let i = 0; i < physical; i++) {
-        toCreate.push({ number: n++, type: 'PHYSICAL' as const, active: true })
-    }
-    for (let i = 0; i < virtual; i++) {
-        toCreate.push({ number: n++, type: 'VIRTUAL' as const, active: true })
-    }
-    for (const e of toCreate) {
+import {createHash} from "crypto"
+
+
+const NAMESPACE_V1 = "EASTER_EGG_NAMESPACE_v1"
+
+function base36FromHexPrefix(hex: string, bytes: number) {
+    const slice = hex.slice(0, bytes * 2)
+    const val = BigInt("0x" + slice)
+    return val.toString(36).toUpperCase()
+}
+
+export function codeForEgg(num: number, type: "PHYSICAL" | "VIRTUAL", len = 7) {
+    const h = createHash("sha256")
+        .update(`${NAMESPACE_V1}:${type}:${num}`, "utf8")
+        .digest("hex")
+
+    const body = base36FromHexPrefix(h, 5).slice(0, len)
+    return `${type === "PHYSICAL" ? "P" : "V"}-${body}`
+}
+
+function pad(n: number, width = 3) {
+    const s = String(n)
+    return s.length >= width ? s : "0".repeat(width - s.length) + s
+}
+
+export async function seedEasterEggs() {
+    const virtuals = [
+        { number: 1, label: "Jajo dla czytających do końca", placementKey: "shop" },
+        { number: 2, label: "Zostało mi już tylko jedno", placementKey: "ranking-last" },
+        { number: 3, label: "Ups, a skąd to się tu wzięło (czaicie, bo egg to jajo. Tea bag, hehe)", placementKey: "ranking-first" },
+        { number: 4, label: "Jajo dla grzebiących na stronie", placementKey: "admin-page" },
+        { number: 5, label: "Jajo dla bardzo grzebiących na stronie", placementKey: "admin-page-2" },
+        { number: 6, label: "Jajo dla czytających do końca", placementKey: "how-to-earn" },
+        { number: 7, label: "Jajo dla eksploratora strony", placementKey: "duels" },
+        { number: 8, label: "Damn, chłop już drabinkę przegranych przegląda", placementKey: "losers" },
+    ]
+    for (const v of virtuals) {
         await prisma.easterEgg.upsert({
-            where: { number: e.number },
+            where: { number: v.number },
+            update: { placementKey: v.placementKey ?? null },
+            create: {
+                number: v.number,
+                type: "VIRTUAL",
+                code: codeForEgg(v.number, "VIRTUAL", 7),
+                label: v.label,
+                active: true,
+                placementKey: v.placementKey,
+            },
+        })
+    }
+
+    for (let i = 1; i <= 15; i++) {
+        await prisma.easterEgg.upsert({
+            where: { number: i },
             update: {},
-            create: e,
+            create: {
+                number: i+100,
+                type: "PHYSICAL",
+                code: codeForEgg(i, "PHYSICAL", 7),
+                label: `Fizyczny #${pad(i)}`,
+                active: true,
+            },
         })
     }
 }
 
 async function main() {
-    await seedEasterEggs({ physical: 12, virtual: 8 })
+    await seedEasterEggs()
 
     const names = [
-        {name: 'Antoni', avatarUrl: '/images/participants/antoni.png', balance: 10},
-        {name: 'Borys', avatarUrl: '/images/participants/borys.png', balance: 10},
-        {name: 'Cezary', avatarUrl: '/images/participants/cezary.png', balance: 10},
-        {name: 'Damian', avatarUrl: '/images/participants/damian.png', balance: 10},
-        {name: 'Emil', avatarUrl: '/images/participants/emil.png', balance: 10},
-        {name: 'Filip', avatarUrl: '/images/participants/filip.png', balance: 10},
-        {name: 'Gabriel', avatarUrl: '/images/participants/gabriel.png', balance: 10},
-        {name: 'Henryk', avatarUrl: '/images/participants/henryk.png', balance: 10},
-        {name: 'Igor', avatarUrl: '/images/participants/igor.png', balance: 10},
-        {name: 'Julian', avatarUrl: '/images/participants/julian.png', balance: 10},
-        {name: 'Konrad', avatarUrl: '/images/participants/konrad.png', balance: 10},
-        {name: 'Leon', avatarUrl: '/images/participants/leon.png', balance: 10},
+        {name: 'Antoni', avatarUrl: '/images/participants/antoni.png', balance: 100},
+        {name: 'Borys', avatarUrl: '/images/participants/borys.png', balance: 100},
+        {name: 'Cezary', avatarUrl: '/images/participants/cezary.png', balance: 100},
+        {name: 'Damian', avatarUrl: '/images/participants/damian.png', balance: 100},
+        {name: 'Emil', avatarUrl: '/images/participants/emil.png', balance: 100},
+        {name: 'Filip', avatarUrl: '/images/participants/filip.png', balance: 100},
+        {name: 'Gabriel', avatarUrl: '/images/participants/gabriel.png', balance: 100},
+        {name: 'Henryk', avatarUrl: '/images/participants/henryk.png', balance: 100},
+        {name: 'Igor', avatarUrl: '/images/participants/igor.png', balance: 100},
+        {name: 'Julian', avatarUrl: '/images/participants/julian.png', balance: 100},
+        {name: 'Konrad', avatarUrl: '/images/participants/konrad.png', balance: 100},
+        {name: 'Leon', avatarUrl: '/images/participants/leon.png', balance: 100},
     ]
 
     await Promise.all(
@@ -49,15 +97,14 @@ async function main() {
     )
 
     const items = [
-        {key: 'give-shot', label: 'Każ komuś wypić szota', cost: 50, category: 'przeszkadzanie'},
-        {key: 'swimming-goggles', label: 'Okulary do pływania przez 10 minut', cost: 100, category: 'przeszkadzanie'},
-        {key: 'jump-lake', label: 'Zanurzenie głowy / skok do jeziora', cost: 150, category: 'przeszkadzanie'},
-        {key: 'switch-opponent', label: 'Zmiana przeciwnika w następnym meczu', cost: 100, category: 'przeszkadzanie'},
-        {key: 'left-hand', label: 'Lewa ręka – kara w następnym meczu', cost: 150, category: 'przeszkadzanie'},
-        {key: 'freeze-casino', label: 'Zamrożenie hazardu na 10 min', cost: 150, category: 'przeszkadzanie'},
-
+        {key: 'give-shot', label: 'Każ komuś wypić szota', cost: 50, category: 'troll'},
+        {key: 'swimming-goggles', label: 'Okulary do pływania przez 10 minut', cost: 100, category: 'troll'},
+        {key: 'jump-lake', label: 'Każ komuś zanurzyć głowę w jeziorze', cost: 200, category: 'troll'},
+        {key: 'switch-opponent', label: 'Zmień komuś przeciwnika w meczu', cost: 100, category: 'troll'},
+        {key: 'left-hand', label: 'Lewa ręka – kara w następnym meczu', cost: 150, category: 'troll'},
         {key: 'immunity', label: 'Immunitet (nikt Ci nie przeszkadza do końca mini-gry)', cost: 150, category: 'buff'},
-        {key: 'double-points-4', label: 'Double Points (4 kolejne mecze turniejowe)', cost: 120, category: 'buff'},
+        {key: 'double-points-4', label: 'Double Points (4 kolejne mecze turniejowe)', cost: 170, category: 'buff'},
+        {key: 'change-opponent', label: 'Zmień sobie przeciwnika w meczu', cost: 100, category: 'buff'},
     ]
 
 
@@ -109,13 +156,14 @@ async function main() {
     )
 
     const groom = await prisma.participant.findFirst({where: {name: 'Antoni'}})
+    const bestman = await prisma.participant.findFirst({where: {name: 'Borys'}})
     if (groom) {
         await prisma.$transaction(async (tx) => {
             const fresh = await tx.participant.findUnique({
                 where: {id: groom.id},
                 select: {balance: true},
             })
-            const amount = 10
+            const amount = 50
             const newBalance = (fresh?.balance ?? 0) + amount
 
             await tx.transaction.create({
@@ -131,6 +179,57 @@ async function main() {
                 data: {balance: newBalance},
             })
         })
+
+        if(bestman){
+            await prisma.shopConfig.upsert({
+                where: { id: 'singleton' },
+                update: {
+                    groomParticipantId: groom?.id ?? null,
+                    audienceExcludeIds: (groom?.id && bestman?.id) ? [groom.id, bestman.id] : (groom?.id ? [groom.id] : []),
+                },
+                create: {
+                    id: 'singleton',
+                    discountsEnabled: false,
+                    discountPercent: 0,
+                    groomParticipantId: groom?.id ?? null,
+                    audienceExcludeIds: (groom?.id && bestman?.id) ? [groom.id, bestman.id] : (groom?.id ? [groom.id] : []),
+                },
+            })
+
+            const groomQs = Array.from({ length: 12 }).map((_, i) => ({
+                kind: 'GROOM' as const,
+                number: i + 1,
+                text: `Pytanie do pana młodego #${i + 1}`,
+                audioUrl: `/audio/groom/${i + 1}.mp3`,
+            }))
+            for (const q of groomQs) {
+                await prisma.quizQuestion.upsert({
+                    where: { kind_number: { kind: 'GROOM', number: q.number } },
+                    update: { text: q.text, audioUrl: q.audioUrl, active: true, answeredAt: null, groomCorrect: null },
+                    create: q,
+                })
+            }
+
+            const audienceQs = Array.from({ length: 12 }).map((_, i) => ({
+                kind: 'AUDIENCE' as const,
+                number: i + 1,
+                text: `Pytanie do publiki #${i + 1}`,
+                audioUrl: `/audio/audience/${i + 1}.mp3`,
+            }))
+            for (const q of audienceQs) {
+                await prisma.quizQuestion.upsert({
+                    where: { kind_number: { kind: 'AUDIENCE', number: q.number } },
+                    update: { text: q.text, audioUrl: q.audioUrl, active: true, answeredAt: null, awardedParticipantId: null },
+                    create: q,
+                })
+            }
+
+            await prisma.quizMeta.upsert({
+                where: { id: 'singleton' },
+                update: { audienceBonusGranted: false },
+                create: { id: 'singleton', audienceBonusGranted: false },
+            })
+        }
     }
 }
 

@@ -9,18 +9,9 @@ import {toast} from 'sonner'
 import {CustomLoader} from '@/components/ui/CustomLoader'
 import {ParticipantDto} from '@/types/participant'
 import {getAdmin} from "@/hooks/useAdmin";
+import {EasterEggDto} from "@/types/easter-egg";
 
-type Egg = {
-    id: string
-    number: number
-    type: 'PHYSICAL' | 'VIRTUAL'
-    active: boolean
-    claimedAt?: string | null
-    claimedBy?: { id: string; name: string } | null
-    label?: string | null
-}
-
-async function fetchEgg(id: string): Promise<Egg> {
+async function fetchEgg(id: string): Promise<EasterEggDto> {
     const r = await fetch(`/api/easter-eggs/${id}`, {cache: 'no-store'})
     const d = await r.json()
     if (!r.ok) throw new Error(d?.message || 'Load failed')
@@ -89,20 +80,11 @@ export default function EasterEggPage() {
     return (
         <div className="mx-auto flex max-w-md flex-col gap-4 pt-20 p-6">
             <h1 className="text-2xl font-bold">{title}</h1>
-            <div className="rounded-lg border bg-white/5 p-4">
-                <p className="text-sm text-gray-300">ID: <span className="font-mono">{egg.id}</span></p>
-                <p className="text-sm text-gray-300">Numer: <span className="font-semibold">{egg.number}</span></p>
-                <p className="text-sm text-gray-300">Typ: {egg.type}</p>
-                {!egg.active && (
-                    <p className="mt-2 text-sm text-red-400">Ten easter egg jest już nieaktywny{egg.claimedBy && <> —
-                        odebrał: <b>{egg.claimedBy.name}</b></>}.</p>
-                )}
-            </div>
 
             {egg.active ? (
                 <div className="rounded-lg border bg-white/5 p-4 flex flex-col gap-3">
                     <p className="text-sm">
-                        To jajko jest warte <strong>50 $pruch</strong>. Wybierz poniżej, kim jesteś, aby odebrać punkty.
+                        To jajko jest warte <strong className="text-primary">50 $pruch</strong>. Wybierz poniżej, kim jesteś, aby odebrać punkty.
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
@@ -131,14 +113,15 @@ export default function EasterEggPage() {
                 </div>
             ) : (
                 <div className="rounded-lg border bg-white/5 p-4 flex flex-col gap-3">
-                    <p className="text-sm">
-                        To jajko zostało już zebrane
-                        {egg.claimedBy && (
-                            <> —
-                                odebrał(a): <b>{egg.claimedBy.name}</b>{egg.claimedAt ? `, ${new Date(egg.claimedAt).toLocaleString()}` : ''}</>
-                        )}
-                        .
+                    <p className="text-base text-destructive">
+                        To jajko zostało już znalezione.
                     </p>
+                    {egg.claimedBy && (
+                        <p className="text-xs text-gray-400">
+                            znalazł: <b
+                            className="text-primary">{egg.claimedBy.name}</b>{egg.claimedAt ? `, ${new Date(egg.claimedAt).toLocaleString()}` : ''}
+                        </p>
+                    )}
                     {isAdmin && (
                         <div className="flex items-center gap-2">
                             <Button
@@ -155,16 +138,24 @@ export default function EasterEggPage() {
                     )}
                 </div>
             )}
+            {egg?.counts && (
+                <div className="rounded-lg border bg-white/10 p-4 flex flex-col gap-3">
+                    <p className="text-xs text-muted-foreground">
+                        Pozostało <b>{egg.counts.remaining}</b> z <b>{egg.counts.total}</b> aktywnych jajek {egg.type === 'PHYSICAL' ? 'fizycznych' : 'wirtualnych'}
+                    </p>
+                </div>
 
-            {/* Meta / szczegóły (przydatne dla admina i do debugowania QR) */}
-            <div className="rounded-lg border bg-white/5 p-4 text-xs text-gray-400">
-                {egg.label && <p><span className="text-gray-500">Etykieta:</span> <span
-                    className="text-gray-300">{egg.label}</span></p>}
-                <p><span className="text-gray-500">ID:</span> <span className="font-mono">{egg.id}</span></p>
-                <p><span className="text-gray-500">Numer:</span> {egg.number}</p>
-                <p><span className="text-gray-500">Typ:</span> {egg.type}</p>
-                <p><span className="text-gray-500">Status:</span> {egg.active ? 'AKTYWNY' : 'NIEAKTYWNY'}</p>
-            </div>
+            )}
+            {isAdmin &&
+                <div className="rounded-lg border bg-white/5 p-4 text-xs text-gray-400">
+                    {egg.label && <p><span className="text-gray-500">Etykieta:</span> <span
+                        className="text-gray-300">{egg.label}</span></p>}
+                    <p><span className="text-gray-500">ID:</span> <span className="font-mono">{egg.id}</span></p>
+                    <p><span className="text-gray-500">Numer:</span> {egg.number}</p>
+                    <p><span className="text-gray-500">Typ:</span> {egg.type}</p>
+                    <p><span className="text-gray-500">Status:</span> {egg.active ? 'AKTYWNY' : 'NIEAKTYWNY'}</p>
+                </div>
+            }
         </div>
     )
 }

@@ -7,18 +7,9 @@ import {Input} from '@/components/ui/input'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {toast} from 'sonner'
 import Link from 'next/link'
+import {EasterEggDto} from "@/types/easter-egg";
 
-type Egg = {
-    id: string
-    number: number
-    type: 'PHYSICAL' | 'VIRTUAL'
-    active: boolean
-    label?: string | null
-    claimedAt?: string | null
-    claimedBy?: { id: string; name: string } | null
-}
-
-async function fetchEggs(): Promise<Egg[]> {
+async function fetchEggs(): Promise<EasterEggDto[]> {
     const r = await fetch('/api/easter-eggs', { cache: 'no-store' })
     const d = await r.json()
     if (!r.ok) throw new Error(d?.message || 'Load failed')
@@ -108,7 +99,7 @@ export default function EasterEggsAdmin() {
                                     : 'border-gray-500/30 bg-gray-500/10 text-gray-300'}`}>
                   {e.active ? 'AKTYWNE' : 'NIEAKTYWNE'}
                 </span>
-                                {e.label && <span className="text-xs text-muted-foreground">— {e.label}</span>}
+                                {e.label && <span className="text-xs text-muted-foreground">— {e.label} {e.type==='VIRTUAL' && `— ${e.placementKey}`}</span>}
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
                                 {e.claimedBy
