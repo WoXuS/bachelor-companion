@@ -7,6 +7,7 @@ import {ArrowRightLeft, Award, BanknoteArrowUp, NotepadText} from "lucide-react"
 import {Ranking} from "@/components/icons/Ranking";
 import {Tournament} from "@/components/icons/Tournament";
 import React from "react";
+import EasterEggsAdmin from "@/app/admin/EasterEggsAdmin";
 
 export default function AdminPage() {
     if (!isAdminServer()) redirect('/admin/login')
@@ -37,6 +38,10 @@ export default function AdminPage() {
             <section>
                 <h2 className="text-xl font-semibold mb-3">Uczestnicy (CRUD)</h2>
                 <ParticipantsAdmin />
+            </section>
+            <section>
+                <h2 className="mb-3 text-xl font-semibold">Jajka (zarządzanie)</h2>
+                <EasterEggsAdmin />
             </section>
         </div>
     )

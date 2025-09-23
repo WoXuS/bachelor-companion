@@ -1,4 +1,4 @@
-// src/app/api/shop/manage/route.ts
+// src/app/api/shop/manage/route.ts.ts
 import { NextResponse } from 'next/server'
 import { createShopItem, updateShopItem } from '@/server/db/repositories/shop.repo'
 

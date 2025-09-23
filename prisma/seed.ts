@@ -2,7 +2,27 @@ import {PrismaClient} from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+async function seedEasterEggs({ physical = 12, virtual = 8 }: { physical?: number; virtual?: number }) {
+    const toCreate = []
+    let n = 1
+    for (let i = 0; i < physical; i++) {
+        toCreate.push({ number: n++, type: 'PHYSICAL' as const, active: true })
+    }
+    for (let i = 0; i < virtual; i++) {
+        toCreate.push({ number: n++, type: 'VIRTUAL' as const, active: true })
+    }
+    for (const e of toCreate) {
+        await prisma.easterEgg.upsert({
+            where: { number: e.number },
+            update: {},
+            create: e,
+        })
+    }
+}
+
 async function main() {
+    await seedEasterEggs({ physical: 12, virtual: 8 })
+
     const names = [
         {name: 'Antoni', avatarUrl: '/images/participants/antoni.png', balance: 10},
         {name: 'Borys', avatarUrl: '/images/participants/borys.png', balance: 10},
