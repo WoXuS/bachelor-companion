@@ -70,11 +70,11 @@ function PodiumColumn({
                 />
                 {p.name === "Antoni" &&
                     <VirtualEggButton placementKey="ranking-first"
-                                      className="absolute right-[30%] top-[70%] transform-[translate(-50%,-50%)] z-20 opacity-60"/>
+                                      className="absolute right-[30%] top-[70%] transform-[translate(-50%,-50%)] z-20 opacity-35"/>
                 }
                 {p.name === "Borys" &&
                     <VirtualEggButton placementKey="ranking-last"
-                                      className="absolute right-[50%] top-[50%] transform-[translate(-50%,-50%)] z-20 opacity-60"/>
+                                      className="absolute right-[50%] top-[50%] transform-[translate(-50%,-50%)] z-20 opacity-35"/>
                 }
                 {p.buffs?.map(buff => (
                     buff.type === "DOUBLE_POINTS" && buff.remainingMatches > 0 &&
