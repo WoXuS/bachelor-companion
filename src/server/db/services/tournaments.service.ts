@@ -1,8 +1,33 @@
 import {prisma} from '../prisma'
 import {addTransaction} from './economy.service'
-import {Prisma, TournamentTeamMember} from '@prisma/client'
+import {Prisma, TournamentTeamMember, Match, Tournament} from '@prisma/client'
 import {NextResponse} from "next/server";
 import {TMatch} from "@/types/tournament";
+
+type MatchForLogic = Pick<
+    Match,
+    | 'id'
+    | 'tournamentId'
+    | 'round'
+    | 'participantAId'
+    | 'participantBId'
+    | 'teamAId'
+    | 'teamBId'
+    | 'winnerParticipantId'
+    | 'winnerTeamId'
+    | 'nextMatchId'
+    | 'nextMatchSlot'
+    | 'bracket'
+    | 'isBye'
+    | 'isPlayIn'
+    | 'scoreA'
+    | 'scoreB'
+>
+
+type TournamentForLogic = Pick<
+    Tournament,
+    'id' | 'type' | 'title' | 'mainPrize' | 'consolationPrize'
+>
 
 function shuffle<T>(arr: T[]) {
     return arr
@@ -38,17 +63,17 @@ export async function createTeamTournament(params: {
     })
 }
 
-async function getTeamMemberIds(tx: any, teamId: string): Promise<string[]> {
+async function getTeamMemberIds(tx: Tx, teamId: string): Promise<string[]> {
     const members = await tx.tournamentTeamMember.findMany({
         where: {teamId},
         select: {participantId: true},
     })
-    return members.map((m: TournamentTeamMember) => m.participantId)
+    return members.map(m => m.participantId)
 }
 
 type Tx = Prisma.TransactionClient
 
-const BRACKET_LABEL: Record<'WINNERS'|'LOSERS'|'GRAND_FINAL', string> = {
+const BRACKET_LABEL: Record<'WINNERS' | 'LOSERS' | 'GRAND_FINAL', string> = {
     WINNERS: 'drab. wygranych',
     LOSERS: 'drab. przegranych',
     GRAND_FINAL: 'wygrana turnieju',
@@ -56,37 +81,37 @@ const BRACKET_LABEL: Record<'WINNERS'|'LOSERS'|'GRAND_FINAL', string> = {
 
 async function getActiveDP(tx: Tx, participantId: string) {
     return tx.participantBuff.findFirst({
-        where: { participantId, type: 'DOUBLE_POINTS', active: true, remainingMatches: { gt: 0 } },
-        orderBy: { createdAt: 'desc' },
+        where: {participantId, type: 'DOUBLE_POINTS', active: true, remainingMatches: {gt: 0}},
+        orderBy: {createdAt: 'desc'},
     })
 }
 
 async function decrementDPIfAny(tx: Tx, participantId: string, matchId: string) {
     const updated = await tx.participantBuff.updateMany({
-        where: { participantId, type: 'DOUBLE_POINTS', active: true, remainingMatches: { gt: 0 } },
-        data: { remainingMatches: { decrement: 1 } },
+        where: {participantId, type: 'DOUBLE_POINTS', active: true, remainingMatches: {gt: 0}},
+        data: {remainingMatches: {decrement: 1}},
     })
     if (updated.count > 0) {
         await tx.participantBuff.updateMany({
-            where: { participantId, type: 'DOUBLE_POINTS', remainingMatches: 0, active: true },
-            data: { active: false },
+            where: {participantId, type: 'DOUBLE_POINTS', remainingMatches: 0, active: true},
+            data: {active: false},
         })
         await tx.participantBuffUsage.create({
-            data: { participantId, matchId, used: 1 },
+            data: {participantId, matchId, used: 1},
         })
     }
 }
 
 async function isWinnersPlayInMatch(tx: Tx, tournamentId: string, round: number): Promise<boolean> {
     const minRoundRow = await tx.match.findFirst({
-        where: { tournamentId, bracket: 'WINNERS' },
-        orderBy: { round: 'asc' },
-        select: { round: true },
+        where: {tournamentId, bracket: 'WINNERS'},
+        orderBy: {round: 'asc'},
+        select: {round: true},
     })
     if (!minRoundRow) return false
     const minR = minRoundRow.round
     const anyByeInMin = await tx.match.count({
-        where: { tournamentId, bracket: 'WINNERS', round: minR, isBye: true },
+        where: {tournamentId, bracket: 'WINNERS', round: minR, isBye: true},
     })
     if (anyByeInMin === 0) return false
     return round === minR
@@ -99,17 +124,22 @@ async function isPlayInMatch(tx: Tx, m: TMatch): Promise<boolean> {
 
 async function teamMemberIds(tx: Tx, teamId: string): Promise<string[]> {
     const members = await tx.tournamentTeamMember.findMany({
-        where: { teamId },
-        select: { participantId: true },
+        where: {teamId},
+        select: {participantId: true},
     })
     return members.map(m => m.participantId)
 }
 
-function isSoloMatch(m: { participantAId: string|null, participantBId: string|null }): boolean {
+function isSoloMatch(m: Pick<MatchForLogic, 'participantAId' | 'participantBId'>): boolean {
     return !!(m.participantAId || m.participantBId)
 }
 
-async function winnerParticipantIds(tx: Tx, m: any, winner: 'A'|'B'): Promise<string[]> {
+
+async function winnerParticipantIds(
+    tx: Tx,
+    m: MatchForLogic,
+    winner: 'A' | 'B'
+): Promise<string[]> {
     if (isSoloMatch(m)) {
         const pid = winner === 'A' ? m.participantAId : m.participantBId
         if (!pid) throw new Error('Brak uczestnika po wybranej stronie')
@@ -121,36 +151,42 @@ async function winnerParticipantIds(tx: Tx, m: any, winner: 'A'|'B'): Promise<st
     }
 }
 
-async function setMatchWinner(tx: Tx, m: any, winner: 'A'|'B', scoreA?: number, scoreB?: number) {
-    const base = { scoreA: scoreA ?? null, scoreB: scoreB ?? null }
+async function setMatchWinner(
+    tx: Tx,
+    m: MatchForLogic,
+    winner: 'A' | 'B',
+    scoreA?: number,
+    scoreB?: number
+): Promise<{ winnerParticipantId: string | null; winnerTeamId: string | null }> {
+    const base = {scoreA: scoreA ?? null, scoreB: scoreB ?? null}
     if (isSoloMatch(m)) {
         const winnerParticipantId = winner === 'A' ? m.participantAId : m.participantBId
         if (!winnerParticipantId) throw new Error('Brak uczestnika po wybranej stronie')
-        await tx.match.update({ where: { id: m.id }, data: { ...base, winnerParticipantId } })
-        return { winnerParticipantId, winnerTeamId: null as null }
+        await tx.match.update({where: {id: m.id}, data: {...base, winnerParticipantId}})
+        return {winnerParticipantId, winnerTeamId: null}
     } else {
         const winnerTeamId = winner === 'A' ? m.teamAId : m.teamBId
         if (!winnerTeamId) throw new Error('Brak zespołu po wybranej stronie')
-        await tx.match.update({ where: { id: m.id }, data: { ...base, winnerTeamId } })
-        return { winnerParticipantId: null as null, winnerTeamId }
+        await tx.match.update({where: {id: m.id}, data: {...base, winnerTeamId}})
+        return {winnerParticipantId: null, winnerTeamId}
     }
 }
 
-async function advanceWinner(tx: Tx, m: any, winner: 'A'|'B') {
+async function advanceWinner(tx: Tx, m: MatchForLogic, winner: 'A' | 'B') {
     if (!m.nextMatchId || !m.nextMatchSlot) return
     if (isSoloMatch(m)) {
         const pid = winner === 'A' ? m.participantAId : m.participantBId
         if (!pid) return
         await tx.match.update({
-            where: { id: m.nextMatchId },
-            data: m.nextMatchSlot === 'A' ? { participantAId: pid } : { participantBId: pid },
+            where: {id: m.nextMatchId},
+            data: m.nextMatchSlot === 'A' ? {participantAId: pid} : {participantBId: pid},
         })
     } else {
         const tid = winner === 'A' ? m.teamAId : m.teamBId
         if (!tid) return
         await tx.match.update({
-            where: { id: m.nextMatchId },
-            data: m.nextMatchSlot === 'A' ? { teamAId: tid } : { teamBId: tid },
+            where: {id: m.nextMatchId},
+            data: m.nextMatchSlot === 'A' ? {teamAId: tid} : {teamBId: tid},
         })
     }
 }
@@ -169,15 +205,19 @@ async function payMany(tx: Tx, participantIds: string[], baseAmount: number, des
     }
 }
 
-async function shouldPayWinPrize(tx: Tx, m: any): Promise<boolean> {
+async function shouldPayWinPrize(tx: Tx, m: MatchForLogic): Promise<boolean> {
     const isFinal = !m.nextMatchId
     const isPlayIn = m.bracket === 'LOSERS' ? !!m.isPlayIn : await isWinnersPlayInMatch(tx, m.tournamentId, m.round)
     return !(isFinal || isPlayIn)
 }
 
-async function maybePayoutClosedBracket(tx: Tx, t: any, bracket: 'WINNERS'|'LOSERS') {
+async function maybePayoutClosedBracket(
+    tx: Tx,
+    t: TournamentForLogic,
+    bracket: 'WINNERS' | 'LOSERS'
+) {
     const open = await tx.match.count({
-        where: { tournamentId: t.id, bracket, winnerParticipantId: null, winnerTeamId: null },
+        where: {tournamentId: t.id, bracket, winnerParticipantId: null, winnerTeamId: null},
     })
     if (open > 0) return
 
@@ -188,41 +228,58 @@ async function maybePayoutClosedBracket(tx: Tx, t: any, bracket: 'WINNERS'|'LOSE
         where: {
             tournamentId: t.id,
             bracket,
-            ...(t.type === 'SOLO' ? { winnerParticipantId: { not: null } } : { winnerTeamId: { not: null } }),
+            ...(t.type === 'SOLO'
+                ? {winnerParticipantId: {not: null}}
+                : {winnerTeamId: {not: null}}),
         },
-        orderBy: [{ round: 'desc' }, { indexInRound: 'asc' }],
+        orderBy: [{round: 'desc'}, {indexInRound: 'asc'}],
     })
     if (!final) return
 
     if (t.type === 'SOLO' && final.winnerParticipantId) {
-        await payWithDP(tx, final.winnerParticipantId, prize, `Wygrana ${bracket === 'WINNERS' ? 'turnieju' : BRACKET_LABEL[bracket]}, turniej: ${t.title}`, final.id)
+        await payWithDP(
+            tx,
+            final.winnerParticipantId,
+            prize,
+            `Wygrana ${bracket === 'WINNERS' ? 'turnieju' : BRACKET_LABEL[bracket]}, turniej: ${t.title}`,
+            final.id
+        )
     } else if (t.type !== 'SOLO' && final.winnerTeamId) {
         const members = await teamMemberIds(tx, final.winnerTeamId)
-        await payMany(tx, members, prize, `Wygrana ${bracket === 'WINNERS' ? 'turnieju' : BRACKET_LABEL[bracket]}, turniej: ${t.title}`, final.id)
+        await payMany(
+            tx,
+            members,
+            prize,
+            `Wygrana ${bracket === 'WINNERS' ? 'turnieju' : BRACKET_LABEL[bracket]}, turniej: ${t.title}`,
+            final.id
+        )
     }
 }
 
-async function participantsWhoPlayed(tx: Tx, m: any): Promise<string[]> {
+async function participantsWhoPlayed(tx: Tx, m: MatchForLogic): Promise<string[]> {
     if (isSoloMatch(m)) {
         return [m.participantAId, m.participantBId].filter(Boolean) as string[]
     }
     const ids: string[] = []
-    if (m.teamAId) ids.push(...await teamMemberIds(tx, m.teamAId))
-    if (m.teamBId) ids.push(...await teamMemberIds(tx, m.teamBId))
+    if (m.teamAId) ids.push(...(await teamMemberIds(tx, m.teamAId)))
+    if (m.teamBId) ids.push(...(await teamMemberIds(tx, m.teamBId)))
     return ids
 }
 
-export async function reportMatch(params: { matchId: string; winner: 'A'|'B'; scoreA?: number; scoreB?: number }) {
+export async function reportMatch(params: { matchId: string; winner: 'A' | 'B'; scoreA?: number; scoreB?: number }) {
     return prisma.$transaction(async (tx) => {
-        const m = await tx.match.findUnique({ where: { id: params.matchId } })
+        const m = await tx.match.findUnique({where: {id: params.matchId}})
         if (!m) throw new Error('Mecz nie znaleziony')
 
-        const t = await tx.tournament.findUnique({ where: { id: m.tournamentId } })
+        const t = await tx.tournament.findUnique({where: {id: m.tournamentId}})
         if (!t) throw new Error('Turniej nie znaleziony')
 
         const playIn = await isPlayInMatch(tx, m)
 
-        const { winnerParticipantId, winnerTeamId } = await setMatchWinner(tx, m, params.winner, params.scoreA, params.scoreB)
+        const {
+            winnerParticipantId,
+            winnerTeamId
+        } = await setMatchWinner(tx, m, params.winner, params.scoreA, params.scoreB)
         await advanceWinner(tx, m, params.winner)
 
         if (!playIn && t.matchWinPrize > 0 && await shouldPayWinPrize(tx, m)) {
@@ -451,7 +508,7 @@ export async function createSoloTournamentCompact(params: {
     })
 }
 
-function startedLite(m: { isBye: boolean; winnerParticipantId: string|null }) {
+function startedLite(m: { isBye: boolean; winnerParticipantId: string | null }) {
     return !!m.winnerParticipantId || m.isBye
 }
 
@@ -460,16 +517,16 @@ export async function createConsolationBracket(
     defaultBestOf: 1 | 3 | 5 = 1
 ) {
     return prisma.$transaction(async (tx: Tx) => {
-        const t = await tx.tournament.findUnique({ where: { id: tournamentId } })
+        const t = await tx.tournament.findUnique({where: {id: tournamentId}})
         if (!t) throw new Error('Turniej nie znaleziony')
         if (t.type !== 'SOLO') throw new Error('Drabinka przegranych tylko dla turniejów SOLO')
 
-        const exists = await tx.match.count({ where: { tournamentId, bracket: 'LOSERS' } })
+        const exists = await tx.match.count({where: {tournamentId, bracket: 'LOSERS'}})
         if (exists > 0) throw new Error('Drabinka przegranych już istnieje')
 
         const wins = await tx.match.findMany({
-            where: { tournamentId, bracket: 'WINNERS' },
-            orderBy: [{ round: 'asc' }, { indexInRound: 'asc' }],
+            where: {tournamentId, bracket: 'WINNERS'},
+            orderBy: [{round: 'asc'}, {indexInRound: 'asc'}],
             select: {
                 id: true, round: true, isBye: true,
                 participantAId: true, participantBId: true, winnerParticipantId: true,
@@ -489,7 +546,10 @@ export async function createConsolationBracket(
 
         let firstNoByeRound: number | null = null
         for (const [r, ms] of [...byRound.entries()].sort((a, b) => a[0] - b[0])) {
-            if (!ms.some(m => m.isBye)) { firstNoByeRound = r; break }
+            if (!ms.some(m => m.isBye)) {
+                firstNoByeRound = r;
+                break
+            }
         }
         if (!firstNoByeRound) throw new Error('Nie znaleziono rundy drabinki wygranych bez auto-awansów')
 
@@ -511,9 +571,9 @@ export async function createConsolationBracket(
         if (uniqLosers.length < 2) throw new Error('Za mało przegranych do wygenerowania drabinki')
 
         const seeds = await tx.participant.findMany({
-            where: { id: { in: uniqLosers } },
-            select: { id: true, balance: true },
-            orderBy: { balance: 'desc' },
+            where: {id: {in: uniqLosers}},
+            select: {id: true, balance: true},
+            orderBy: {balance: 'desc'},
         })
         const seeded = seeds.map(s => s.id) // najlepszy balans = wyżej seed
 
@@ -528,7 +588,7 @@ export async function createConsolationBracket(
         async function createRound(
             roundNo: number,
             entrants: Entrant[],
-            opts: { bracket: 'LOSERS'; isPlayIn: boolean; bestOf: 1|3|5 }
+            opts: { bracket: 'LOSERS'; isPlayIn: boolean; bestOf: 1 | 3 | 5 }
         ) {
             if (entrants.length % 2 !== 0) throw new Error(`Niezgodna liczba slotów w rundzie ${roundNo}`)
             const ids: string[] = []
@@ -551,16 +611,16 @@ export async function createConsolationBracket(
                         isPlayIn: opts.isPlayIn,
                         bestOf: opts.bestOf,
                     },
-                    select: { id: true },
+                    select: {id: true},
                 })
                 ids.push(m.id)
                 newMatches.push(m)
 
                 if (A.kind === 'fromMatch') {
-                    await tx.match.update({ where: { id: A.matchId }, data: { nextMatchId: m.id, nextMatchSlot: 'A' } })
+                    await tx.match.update({where: {id: A.matchId}, data: {nextMatchId: m.id, nextMatchSlot: 'A'}})
                 }
                 if (B.kind === 'fromMatch') {
-                    await tx.match.update({ where: { id: B.matchId }, data: { nextMatchId: m.id, nextMatchSlot: 'B' } })
+                    await tx.match.update({where: {id: B.matchId}, data: {nextMatchId: m.id, nextMatchSlot: 'B'}})
                 }
             }
 
@@ -575,31 +635,42 @@ export async function createConsolationBracket(
             for (let i = 0; i < l0Pool.length; i += 2) {
                 const a = l0Pool[i], b = l0Pool[i + 1]
                 if (!a || !b) throw new Error('Nieprawidłowa liczba graczy w L0')
-                entrantsL0.push({ kind: 'player', id: a }, { kind: 'player', id: b })
+                entrantsL0.push({kind: 'player', id: a}, {kind: 'player', id: b})
             }
-            const l0Ids = await createRound(roundNo, entrantsL0, { bracket: 'LOSERS', isPlayIn: true, bestOf: defaultBestOf })
+            const l0Ids = await createRound(roundNo, entrantsL0, {
+                bracket: 'LOSERS',
+                isPlayIn: true,
+                bestOf: defaultBestOf
+            })
             createdByRound.push(l0Ids)
             roundNo++
         }
 
-        const winnersFromL0: Entrant[] = hasPlayIn ? createdByRound[0].map(id => ({ kind: 'fromMatch', matchId: id })) : []
+        const winnersFromL0: Entrant[] = hasPlayIn ? createdByRound[0].map(id => ({
+            kind: 'fromMatch',
+            matchId: id
+        })) : []
         const slotsL1: Entrant[] = []
 
         const k = Math.min(fixedL1.length, winnersFromL0.length)
-        for (let i = 0; i < k; i++) slotsL1.push({ kind: 'player', id: fixedL1[i] }, winnersFromL0[i])
-        for (let i = k; i < fixedL1.length; i++) slotsL1.push({ kind: 'player', id: fixedL1[i] })
+        for (let i = 0; i < k; i++) slotsL1.push({kind: 'player', id: fixedL1[i]}, winnersFromL0[i])
+        for (let i = k; i < fixedL1.length; i++) slotsL1.push({kind: 'player', id: fixedL1[i]})
         for (let i = k; i < winnersFromL0.length; i++) slotsL1.push(winnersFromL0[i])
 
         if (slotsL1.length % 2 !== 0) throw new Error('Niezgodna liczba graczy w L1 (nieparzysta)')
 
-        const l1Ids = await createRound(roundNo, slotsL1, { bracket: 'LOSERS', isPlayIn: false, bestOf: defaultBestOf })
+        const l1Ids = await createRound(roundNo, slotsL1, {bracket: 'LOSERS', isPlayIn: false, bestOf: defaultBestOf})
         createdByRound.push(l1Ids)
         roundNo++
 
         while (createdByRound[createdByRound.length - 1].length > 1) {
             const prev = createdByRound[createdByRound.length - 1]
-            const entrantsNext: Entrant[] = prev.map(id => ({ kind: 'fromMatch', matchId: id }))
-            const nextIds = await createRound(roundNo, entrantsNext, { bracket: 'LOSERS', isPlayIn: false, bestOf: defaultBestOf })
+            const entrantsNext: Entrant[] = prev.map(id => ({kind: 'fromMatch', matchId: id}))
+            const nextIds = await createRound(roundNo, entrantsNext, {
+                bracket: 'LOSERS',
+                isPlayIn: false,
+                bestOf: defaultBestOf
+            })
             createdByRound.push(nextIds)
             roundNo++
         }

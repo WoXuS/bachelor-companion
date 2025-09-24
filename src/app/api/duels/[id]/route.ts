@@ -1,6 +1,7 @@
 import {NextResponse} from 'next/server'
 import {getDuel} from '@/server/db/repositories/duels.repo'
 import {prisma} from "@/server/db/prisma";
+import { Prisma } from "@prisma/client";
 
 type Params = { params: { id: string } }
 
@@ -17,34 +18,41 @@ export async function PATCH(req: Request, {params}: Params) {
     return NextResponse.json(m)
 }
 
-export async function PUT(req: Request, {params}: Params) {
+export async function PUT(req: Request, { params }: Params) {
     const body = await req.json()
-    const duel = await prisma.duel.findUnique({where: {id: params.id}})
-    if (!duel) return NextResponse.json({message: 'Not found'}, {status: 404})
+    const duel = await prisma.duel.findUnique({ where: { id: params.id } })
+    if (!duel) return NextResponse.json({ message: 'Not found' }, { status: 404 })
 
-    const started = (
+    const started =
         duel.winnerId ||
         duel.scoreA != null ||
         duel.scoreB != null
-    )
 
-    const data: any = {}
+    const data: Prisma.DuelUncheckedUpdateInput = {}
+
     if (typeof body.title === 'string') data.title = body.title.trim()
+
     if (typeof body.stake !== 'undefined') {
         const stake = Number(body.stake)
-        if (!Number.isFinite(stake) || stake < 0)
-            return NextResponse.json({message: 'Invalid stake'}, {status: 400})
+        if (!Number.isFinite(stake) || stake < 0) {
+            return NextResponse.json({ message: 'Invalid stake' }, { status: 400 })
+        }
         data.stake = stake
     }
 
     if (!started) {
         if (body.playerAId) data.playerAId = body.playerAId
         if (body.playerBId) data.playerBId = body.playerBId
-        if (data.playerAId && data.playerBId && data.playerAId === data.playerBId)
-            return NextResponse.json({message: 'Players must be different'}, {status: 400})
+        if (
+            data.playerAId &&
+            data.playerBId &&
+            data.playerAId === data.playerBId
+        ) {
+            return NextResponse.json({ message: 'Players must be different' }, { status: 400 })
+        }
     }
 
-    const updated = await prisma.duel.update({where: {id: params.id}, data})
+    const updated = await prisma.duel.update({ where: { id: params.id }, data })
     return NextResponse.json(updated)
 }
 

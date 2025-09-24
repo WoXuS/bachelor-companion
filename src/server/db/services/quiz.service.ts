@@ -1,9 +1,17 @@
 import {prisma} from '@/server/db/prisma'
-import { Prisma } from "@prisma/client"
+import {Prisma} from "@prisma/client"
 
 const GROOM_POINTS = 20
 const AUDIENCE_POINTS = 40
 const AUDIENCE_BONUS = 50
+
+function toStringArray(json: Prisma.JsonValue | null | undefined): string[] {
+    if (!json) return []
+    if (Array.isArray(json)) {
+        return (json as Prisma.JsonArray).filter((v): v is string => typeof v === 'string')
+    }
+    return []
+}
 
 export async function getGroomStats() {
     const [total, answered, correct] = await Promise.all([
@@ -99,7 +107,7 @@ export async function undoLastAudience() {
 export async function getAudienceStandings() {
     return prisma.$transaction(async (tx) => {
         const cfg = await tx.shopConfig.findUnique({where: {id: 'singleton'}})
-        const excludeIds: string[] = Array.isArray(cfg?.audienceExcludeIds) ? (cfg!.audienceExcludeIds as any) : []
+        const excludeIds = toStringArray(cfg?.audienceExcludeIds)
 
         const rows = await tx.quizQuestion.groupBy({
             by: ['awardedParticipantId'],
@@ -125,6 +133,7 @@ export async function getAudienceStandings() {
         }))
 
         full.sort((a, b) => b.correct - a.correct || a.name.localeCompare(b.name))
+
         const maxCorrect = full.length ? Math.max(...full.map(x => x.correct)) : 0
 
         const meta = await tx.quizMeta.findUnique({where: {id: 'singleton'}})
@@ -237,9 +246,12 @@ export async function finalizeAudienceBonus() {
     })
 }
 
-async function computeAudienceWinners(tx: Prisma.TransactionClient, grant: boolean) {
+async function computeAudienceWinners(
+    tx: Prisma.TransactionClient,
+    grant: boolean
+) {
     const cfg = await tx.shopConfig.findUnique({where: {id: 'singleton'}})
-    const excludeIds: string[] = Array.isArray(cfg?.audienceExcludeIds) ? (cfg!.audienceExcludeIds as any) : []
+    const excludeIds = toStringArray(cfg?.audienceExcludeIds)
 
     const rows = await tx.quizQuestion.groupBy({
         by: ['awardedParticipantId'],
@@ -260,7 +272,7 @@ async function computeAudienceWinners(tx: Prisma.TransactionClient, grant: boole
         for (const w of winners) {
             const p = await tx.participant.findUnique({
                 where: {id: w.participantId},
-                select: {balance: true, name: true}
+                select: {balance: true, name: true},
             })
             if (!p) continue
             const next = p.balance + AUDIENCE_BONUS
@@ -280,12 +292,14 @@ async function computeAudienceWinners(tx: Prisma.TransactionClient, grant: boole
         where: {id: {in: winners.map(w => w.participantId)}},
         select: {id: true, name: true},
     })
+
     return {
         winners: winners.map(w => ({
             participantId: w.participantId,
             name: enriched.find(e => e.id === w.participantId)?.name ?? '—',
-            correct: w.correct
+            correct: w.correct,
         })),
         maxCorrect,
     }
 }
+

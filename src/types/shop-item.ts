@@ -10,3 +10,10 @@ export type ShopItemDto = {
     adjustPercent?: number | null
     pricingSource?: 'global' | 'item' | null
 }
+export type UpdateShopItemPatch = {
+    label?: string
+    category?: string
+    cost?: number
+    adjustPercent?: number
+    adjustOverrideEnabled?: boolean
+}

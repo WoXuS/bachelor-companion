@@ -212,17 +212,17 @@ export async function deleteTournament(id: string) {
 }
 
 export async function tournamentStarted(tournamentId: string): Promise<boolean> {
-    const any = await prisma.match.findFirst({
+    const startedMatch = await prisma.match.findFirst({
         where: {
             tournamentId,
             OR: [
-                {winnerParticipantId: {not: null}},
-                {winnerTeamId: {not: null}},
-                {scoreA: {not: null}},
-                {scoreB: {not: null}},
+                { winnerParticipantId: { not: null } },
+                { winnerTeamId: { not: null } },
+                { scoreA: { not: null } },
+                { scoreB: { not: null } },
             ],
         },
-        select: {id: true},
+        select: { id: true },
     })
-    return !!any
+    return startedMatch != null
 }

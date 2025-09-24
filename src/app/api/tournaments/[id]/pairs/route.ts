@@ -30,7 +30,14 @@ export async function PUT(req: Request, {params}: { params: { id: string } }) {
         }
 
         await Promise.all(
-            pairs.map((p: any) => prisma.match.update({
+            pairs.map((p: {
+                participantAId: string | null,
+                participantBId: string | null,
+                scoreA: number | null,
+                scoreB: number | null,
+                winnerParticipantId: string | null,
+                matchId: string,
+            }) => prisma.match.update({
                 where: {id: p.matchId},
                 data: {
                     participantAId: p.participantAId ?? null,
@@ -42,7 +49,7 @@ export async function PUT(req: Request, {params}: { params: { id: string } }) {
 
         return NextResponse.json({ok: true})
     } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, {status: 400})
+        return NextResponse.json({message: errMsg(e)}, {status: 400})
     }
 }
 

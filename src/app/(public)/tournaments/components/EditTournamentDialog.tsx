@@ -10,7 +10,7 @@ import {toast} from 'sonner'
 import {TTournament, TournamentType} from '@/types/tournament'
 import {ParticipantDto} from '@/types/participant'
 import {Cog, Trash2} from "lucide-react";
-import {CreateTournamentPayload, UpdateTournamentBasicsPayload, UpdateTournamentParticipantsPayload} from "@/types/api";
+import { UpdateTournamentBasicsPayload, UpdateTournamentParticipantsPayload} from "@/types/api";
 import {errMsg} from "@/lib/error";
 
 async function fetchTournament(id: string): Promise<TTournament> {

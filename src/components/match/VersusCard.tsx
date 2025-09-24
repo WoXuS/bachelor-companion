@@ -7,6 +7,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {toast} from 'sonner'
 import {Crown, RefreshCw} from 'lucide-react'
+import {DuelDto} from "@/types/duel";
 
 type BestOf = 1 | 3 | 5
 const winsNeeded = (bestOf?: number) => Math.ceil((bestOf ?? 1) / 2)
@@ -42,9 +43,9 @@ type Props = {
     scoreA?: number | null
     scoreB?: number | null
 
-    onChangeBestOfAction: (bo: BestOf) => Promise<any> | void
-    onReportAction: (winner: 'A' | 'B', scoreA?: number, scoreB?: number) => Promise<any> | void
-    onResetAction: () => Promise<any> | void
+    onChangeBestOfAction: (bo: BestOf) => Promise<void> | void
+    onReportAction: (winner: 'A' | 'B', scoreA?: number, scoreB?: number) => Promise<DuelDto> | void
+    onResetAction: () => Promise<DuelDto> | void
 
     furthestActiveMatchIdByParticipant?: Record<string, string>
 }
