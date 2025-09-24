@@ -1,10 +1,12 @@
 import {NextResponse} from 'next/server'
 import {getEggByCodeWithCounts, claimEggByCode} from '@/server/db/services/easter-eggs.service'
 import {errMsg} from "@/lib/error";
+import {Ctx, getParams} from "@/types/api";
 
-export async function GET(_req: Request, {params}: { params: { code: string } }) {
+export async function GET(_req: Request, ctx: Ctx<{ id: string }>) {
+    const {id: code} = await getParams(ctx)
     try {
-        const res = await getEggByCodeWithCounts(params.code)
+        const res = await getEggByCodeWithCounts(code)
         if (!res) return NextResponse.json({message: 'Nie znaleziono'}, {status: 404})
         const {egg, counts} = res
         return NextResponse.json({
@@ -19,17 +21,18 @@ export async function GET(_req: Request, {params}: { params: { code: string } })
             counts: {total: counts.total, found: counts.found, remaining: counts.remaining},
         })
     } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, {status: 500})
+        return NextResponse.json({message: errMsg(e)}, {status: 500})
     }
 }
 
-export async function POST(req: Request, {params}: { params: { code: string } }) {
+export async function POST(req: Request, ctx: Ctx<{ id: string }>) {
+    const {id: code} = await getParams(ctx)
     try {
         const {participantId} = await req.json()
         if (!participantId) return NextResponse.json({message: 'Missing participantId'}, {status: 400})
-        const tx = await claimEggByCode(params.code, participantId)
+        const tx = await claimEggByCode(code, participantId)
         return NextResponse.json(tx)
     } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, {status: 400})
+        return NextResponse.json({message: errMsg(e)}, {status: 400})
     }
 }
