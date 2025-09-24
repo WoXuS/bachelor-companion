@@ -115,7 +115,7 @@ async function main() {
     await prisma.shopConfig.upsert({
         where: {id: 'singleton'},
         update: {},
-        create: {id: 'singleton', discountsEnabled: false, discountPercent: 20},
+        create: {id: 'singleton', discountsEnabled: false, discountPercent: 0},
     })
 
     await Promise.all(
