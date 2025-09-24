@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { deleteShopItem } from '@/server/db/repositories/shop.repo'
 import {errMsg} from "@/lib/error";
+import {Ctx, getParams} from "@/types/api";
 
-type Params = { params: { id: string } }
 
-export async function DELETE(_: Request, { params }: Params) {
-    if (!params.id) {
+export async function DELETE(_req: Request, ctx: Ctx<{ id: string }>) {
+    const { id } = await getParams(ctx)
+
+    if (!id) {
         return NextResponse.json({ message: 'Missing id' }, { status: 400 })
     }
     try {
-        await deleteShopItem(params.id)
+        await deleteShopItem(id)
         return NextResponse.json({ ok: true })
     } catch (e: unknown) {
         return NextResponse.json({ message: errMsg(e) }, { status: 400 })
