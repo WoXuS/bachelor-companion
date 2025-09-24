@@ -137,7 +137,7 @@ export default function EasterEggByCodePage() {
                                 onClick={() => reactivateMut.mutate()}
                                 disabled={reactivateMut.isPending}
                             >
-                                {reactivateMut.isPending ? 'Przywracanie…' : 'Przywróć do gry (admin)'}
+                                {reactivateMut.isPending ? 'Przywracanie…' : 'Przywróć'}
                             </Button>
                             <p className="text-xs text-gray-400">
                                 Przywracanie dotyczy głównie jajek <i>fizycznych</i>.
