@@ -3,6 +3,18 @@ import {TTournament, TMatch} from '@/types/tournament'
 
 export type TeamInput = { name: string; memberIds: string[] }
 
+export type Ctx<T extends Record<string, string> = Record<string, string>> =
+    | { params: T }
+    | { params: Promise<T> }
+
+export async function getParams<T extends Record<string, string>>(ctx: Ctx<T>): Promise<T> {
+    // @ts-expect-error runtime check
+    const p = ctx.params
+    // @ts-expect-error runtime check
+    return typeof p?.then === 'function' ? await p : p
+}
+
+
 export type CreateTournamentPayload =
     | {
     type: TournamentType.SOLO

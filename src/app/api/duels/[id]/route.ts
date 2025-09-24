@@ -3,7 +3,7 @@ import { getDuel } from '@/server/db/repositories/duels.repo'
 import { prisma } from '@/server/db/prisma'
 import type { Prisma } from '@prisma/client'
 
-type Ctx = { params: Promise<{ id: string }> }
+ type Ctx = { params: Promise<{ id: string }> }
 
 export async function GET(_req: NextRequest, ctx: Ctx) {
     const { id } = await ctx.params
