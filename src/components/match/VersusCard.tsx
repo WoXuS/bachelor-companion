@@ -64,7 +64,10 @@ export function VersusCard(props: Props) {
 
     const [scoreA, setScoreA] = React.useState<number>(sA ?? 0)
     const [scoreB, setScoreB] = React.useState<number>(sB ?? 0)
-    React.useEffect(() => { setScoreA(sA ?? 0); setScoreB(sB ?? 0) }, [sA, sB])
+    React.useEffect(() => {
+        setScoreA(sA ?? 0);
+        setScoreB(sB ?? 0)
+    }, [sA, sB])
 
     const need = winsNeeded(bestOf)
     const [confirm, setConfirm] = React.useState<{ open: boolean; winner: 'A' | 'B' | null }>({
@@ -79,8 +82,16 @@ export function VersusCard(props: Props) {
             setConfirm({open: true, winner: side})
         }
     }
-    const onChangeA = (v: number) => { const inc = v > scoreA; setScoreA(v); if (inc) tryConfirmAutoWin('A', v, scoreB) }
-    const onChangeB = (v: number) => { const inc = v > scoreB; setScoreB(v); if (inc) tryConfirmAutoWin('B', scoreA, v) }
+    const onChangeA = (v: number) => {
+        const inc = v > scoreA;
+        setScoreA(v);
+        if (inc) tryConfirmAutoWin('A', v, scoreB)
+    }
+    const onChangeB = (v: number) => {
+        const inc = v > scoreB;
+        setScoreB(v);
+        if (inc) tryConfirmAutoWin('B', scoreA, v)
+    }
 
     const disableBestOf = decided || !canEdit || !onChangeBestOfAction
 
@@ -90,19 +101,22 @@ export function VersusCard(props: Props) {
         return furthestActiveMatchIdByParticipant[memberId] === matchId
     }
 
-    function MembersChips({members}: {members: MemberChip[]}) {
+    function MembersChips({members}: { members: MemberChip[] }) {
         if (!isTeam || members.length === 0) return null
         return (
-            <div className="ml-2 flex flex-wrap gap-1">
+            <div className="ml-2 pb-2 pr-2 flex flex-wrap gap-1">
                 {members.map(m => (
-                    <span key={m.id} className="flex items-center gap-1 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-slate-200">
+                    <span key={m.id}
+                          className="flex items-center gap-1 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-slate-200">
             {m.name}
                         {decided
                             ? (m.doubledThisMatch && (
-                                <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[9px] font-semibold text-emerald-300">×2</span>
+                                <span
+                                    className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[9px] font-semibold text-emerald-300">×2</span>
                             ))
                             : (shouldShowFutureDP(m.id, m.dpRemaining) && (
-                                <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[9px] font-semibold text-emerald-300">
+                                <span
+                                    className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[9px] font-semibold text-emerald-300">
                   DP×2 • {m.dpRemaining}
                 </span>
                             ))
@@ -121,17 +135,13 @@ export function VersusCard(props: Props) {
                     <span className={decided ? 'text-emerald-400' : 'text-orange-400'}>
             {decided ? `Wygrał: ${winnerSide === 'A' ? sideALabel : sideBLabel}` : 'W toku'}
           </span>
-                    {isTeam && decided && winnerDoubledCount > 0 && (
-                        <span className="ml-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 text-[10px] font-semibold text-emerald-300">
-              ×2 ×{winnerDoubledCount}
-            </span>
-                    )}
                 </p>
 
                 {!decided && canEdit && (
                     <div className="flex items-center gap-2">
                         <p className="whitespace-nowrap">Pojedynek BEST OF</p>
-                        <Select onValueChange={(v) => onChangeBestOfAction(Number(v) as BestOf)} value={String(bestOf)} disabled={disableBestOf}>
+                        <Select onValueChange={(v) => onChangeBestOfAction(Number(v) as BestOf)} value={String(bestOf)}
+                                disabled={disableBestOf}>
                             <SelectTrigger className="w-[50px] gap-1 p-2"><SelectValue/></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="1">1</SelectItem>
@@ -141,78 +151,97 @@ export function VersusCard(props: Props) {
                         </Select>
                     </div>
                 )}
-                {decided && <p>Pojedynek <span className="text-primary">BEST OF {bestOf}</span></p>}
+                {decided && <p>Pojedynek <strong className="text-primary">BEST OF {bestOf}</strong></p>}
             </div>
 
             <div className="flex flex-col items-center gap-2 sm:flex-row">
-                <div className={`relative w-full sm:w-auto sm:flex-1 rounded-lg bg-white/10 pr-2 font-medium text-lg ${isBye ? 'ring-1 ring-blue-400' : winnerSide === 'A' ? 'ring-1 ring-emerald-400' : ''}`}>
-                    {canEdit && !decided
-                        ? <Input type="number" min={0} value={scoreA} inputMode="numeric"
-                                 onChange={(e) => onChangeA(Number(e.target.value))}
-                                 className="my-1 ml-2 h-[28px] w-[25px] px-0 py-1 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none"/>
-                        : <span className="flex w-[30px] justify-center rounded-s-lg bg-white/7 py-2 text-sm">{scoreA}</span>}
-                    <span className="text-sm">{sideALabel}</span>
-
-                    <MembersChips members={sideAMembers} />
-
-                    {decided && (
-                        <>
-                            {winnerSide === 'A' && <Crown className="absolute -top-6 -right-3 rotate-[15deg]" color="#EFBF04" size={26}/>}
-                            {!isTeam && (
-                                <p className={`ml-auto text-xs ${winnerSide === 'B' ? 'text-destructive' : 'text-emerald-400'}`}>
-                                    {winnerSide === 'B' ? '-' : '+'}{prize?.amount} $pruch
-                                </p>
+                <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-1">
+                    <div
+                        className={`relative rounded-lg bg-white/10 pr-2 font-medium text-lg flex gap-2 items-center ${isBye ? 'ring-1 ring-blue-400' : winnerSide === 'A' ? 'ring-1 ring-emerald-400' : ''}`}>
+                        {canEdit && !decided
+                            ? <Input type="number" min={0} value={scoreA} inputMode="numeric"
+                                     onChange={(e) => onChangeA(Number(e.target.value))}
+                                     className="my-1 ml-2 h-[28px] w-[25px] px-0 py-1 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none"/>
+                            : <span
+                                className="flex w-[30px] justify-center rounded-s-lg bg-white/7 py-2 text-sm">{scoreA}</span>}
+                        <span className="text-sm">{sideALabel}</span>
+                        <div className="ml-auto flex gap-1">
+                            {decided && (
+                                <>
+                                    {winnerSide === 'A' &&
+                                        <Crown className="absolute -top-6 -right-3 rotate-[15deg]" color="#EFBF04"
+                                               size={26}/>}
+                                    {!isTeam && (
+                                        <p className={`ml-auto text-xs ${winnerSide === 'B' ? 'text-destructive' : 'text-emerald-400'}`}>
+                                            {winnerSide === 'B' ? '-' : '+'}{prize?.amount} $pruch
+                                        </p>
+                                    )}
+                                    {isTeam && winnerSide === 'A' && (
+                                        <p className='ml-auto text-xs text-emerald-400'>
+                                            +{prize?.amount} $pruch
+                                            {winnerDoubledCount > 0 && <span
+                                                className="ml-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[10px] font-semibold text-emerald-300">×2×{winnerDoubledCount}</span>}
+                                        </p>
+                                    )}
+                                </>
                             )}
-                            {isTeam && winnerSide === 'A' && (
-                                <p className='ml-auto text-xs text-emerald-400'>
-                                    +{prize?.amount} $pruch
-                                    {winnerDoubledCount > 0 && <span className="ml-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[10px] font-semibold text-emerald-300">×2×{winnerDoubledCount}</span>}
-                                </p>
-                            )}
-                        </>
-                    )}
 
-                    {winnerSide === 'A' && !isBye && onResetAction && canEdit && (
-                        <Button className="ml-auto" size="icon" variant="destructive" onClick={() => onResetAction()}>
-                            <RefreshCw size="16"/>
-                        </Button>
-                    )}
+                            {winnerSide === 'A' && !isBye && onResetAction && canEdit && (
+                                <Button className="ml-auto" size="icon" variant="destructive"
+                                        onClick={() => onResetAction()}>
+                                    <RefreshCw size="16"/>
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                    <MembersChips members={sideAMembers}/>
                 </div>
 
                 <p className="text-primary">vs</p>
+                <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-1">
+                    <div
+                        className={`relative rounded-lg bg-white/10 pr-2 font-medium text-sm flex flex-col gap-2 ${winnerSide === 'B' ? 'ring-1 ring-emerald-400' : ''}`}>
+                        <div className="flex items-center gap-2">
+                            {canEdit && !decided
+                                ? <Input type="number" min={0} value={scoreB} inputMode="numeric"
+                                         onChange={(e) => onChangeB(Number(e.target.value))}
+                                         className="my-1 ml-2 h-[28px] w-[25px] px-0 py-0 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none"/>
+                                :
+                                <span
+                                    className="flex w-[30px] justify-center rounded-s-lg bg-white/7 py-2">{scoreB}</span>}
+                            <span className="text-sm">{sideBLabel}</span>
+                            <div className="ml-auto flex gap-1">
+                                {decided && (
+                                    <>
+                                        {winnerSide === 'B' &&
+                                            <Crown className="absolute -top-6 -right-3 rotate-[15deg]" color="#EFBF04"
+                                                   size={26}/>}
+                                        {!isTeam && (
+                                            <p className={`ml-auto text-xs ${winnerSide === 'B' ? 'text-emerald-400' : 'text-destructive'}`}>
+                                                {winnerSide === 'B' ? '+' : '-'} {prize?.amount} $pruch
+                                            </p>
+                                        )}
+                                        {isTeam && winnerSide === 'B' && (
+                                            <p className='ml-auto text-xs text-emerald-400'>
+                                                +{prize?.amount} $pruch
+                                                {winnerDoubledCount > 0 && <span
+                                                    className="ml-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[10px] font-semibold text-emerald-300">×2×{winnerDoubledCount}</span>}
+                                            </p>
+                                        )}
+                                    </>
+                                )}
 
-                <div className={`relative w-full sm:w-auto sm:flex-1 rounded-lg bg-white/10 pr-2 font-medium text-sm ${winnerSide === 'B' ? 'ring-1 ring-emerald-400' : ''}`}>
-                    {canEdit && !decided
-                        ? <Input type="number" min={0} value={scoreB} inputMode="numeric"
-                                 onChange={(e) => onChangeB(Number(e.target.value))}
-                                 className="my-1 ml-2 h-[28px] w-[25px] px-0 py-0 text-center text-xs [&::-webkit-inner-spin-button]:appearance-none"/>
-                        : <span className="flex w-[30px] justify-center rounded-s-lg bg-white/7 py-2">{scoreB}</span>}
-                    <span className="text-sm">{sideBLabel}</span>
+                                {winnerSide === 'B' && onResetAction && canEdit && (
+                                    <Button className="ml-auto" size="icon" variant="destructive"
+                                            onClick={() => onResetAction()}>
+                                        <RefreshCw size="16"/>
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <MembersChips members={sideBMembers}/>
 
-                    <MembersChips members={sideBMembers} />
-
-                    {decided && (
-                        <>
-                            {winnerSide === 'B' && <Crown className="absolute -top-6 -right-3 rotate-[15deg]" color="#EFBF04" size={26}/>}
-                            {!isTeam && (
-                                <p className={`ml-auto text-xs ${winnerSide === 'B' ? 'text-emerald-400' : 'text-destructive'}`}>
-                                    {winnerSide === 'B' ? '+' : '-'} {prize?.amount} $pruch
-                                </p>
-                            )}
-                            {isTeam && winnerSide === 'B' && (
-                                <p className='ml-auto text-xs text-emerald-400'>
-                                    +{prize?.amount} $pruch
-                                    {winnerDoubledCount > 0 && <span className="ml-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1 text-[10px] font-semibold text-emerald-300">×2×{winnerDoubledCount}</span>}
-                                </p>
-                            )}
-                        </>
-                    )}
-
-                    {winnerSide === 'B' && onResetAction && canEdit && (
-                        <Button className="ml-auto" size="icon" variant="destructive" onClick={() => onResetAction()}>
-                            <RefreshCw size="16"/>
-                        </Button>
-                    )}
                 </div>
             </div>
 

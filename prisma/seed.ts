@@ -95,7 +95,7 @@ async function main() {
             prisma.participant.upsert({
                 where: {name: p.name},
                 update: {avatarUrl: p.avatarUrl ?? null},
-                create: {name: p.name, avatarUrl: p.avatarUrl ?? null, balance: 0, active: true},
+                create: {name: p.name, avatarUrl: p.avatarUrl ?? null, balance: p.balance ?? 0, active: true},
             })
         )
     )

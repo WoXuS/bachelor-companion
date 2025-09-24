@@ -8,6 +8,7 @@ import {VersusCard} from '@/components/match/VersusCard'
 import {DuelDto} from '@/types/duel'
 import {getAdmin} from '@/hooks/useAdmin'
 import {useParams} from 'next/navigation'
+import {errMsg} from "@/lib/error";
 
 async function fetchDuel(id: string): Promise<DuelDto> {
     const r = await fetch(`/api/duels/${id}`)
@@ -51,7 +52,7 @@ export default function DuelDetailPage() {
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['transactions']})
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const resetMut = useMutation({
@@ -62,7 +63,7 @@ export default function DuelDetailPage() {
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['transactions']})
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const patchBestOf = async (bestOf: 1 | 3 | 5) => {
@@ -82,7 +83,7 @@ export default function DuelDetailPage() {
             toast.success('Zmieniono BO');
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     if (isLoading || !duel) return <CustomLoader/>
@@ -116,6 +117,7 @@ export default function DuelDetailPage() {
                     prize={prize}
                     scoreA={duel.scoreA ?? 0}
                     scoreB={duel.scoreB ?? 0}
+                    matchId={duel.id}
                     onReportAction={(w, a, b) => reportMut.mutate({winner: w, scoreA: a, scoreB: b})}
                     onResetAction={() => resetMut.mutate()}
                     onChangeBestOfAction={async (bo) => {updateBoMut.mutate(bo)}}

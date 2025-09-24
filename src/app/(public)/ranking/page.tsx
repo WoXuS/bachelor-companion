@@ -12,7 +12,6 @@ import {getAdmin} from "@/hooks/useAdmin";
 import {Receipt} from "lucide-react";
 import Link from "next/link";
 import {toast} from "sonner";
-import {NextResponse} from "next/server";
 import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
 
 async function fetchRanking(): Promise<ParticipantDto[]> {
