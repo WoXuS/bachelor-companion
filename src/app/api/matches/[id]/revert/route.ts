@@ -26,8 +26,8 @@ async function revertDPUsageForMatch(tx: Tx, matchId: string) {
     await tx.participantBuffUsage.deleteMany({where: {matchId}})
 }
 
-export async function POST(_req: Request, ctx: Ctx<{ matchId: string }>) {
-    const {matchId} = await getParams(ctx)
+export async function POST(_req: Request, ctx: Ctx<{ id: string }>) {
+    const {id: matchId} = await getParams(ctx)
 
     try {
         const result = await prisma.$transaction(async (tx) => {
