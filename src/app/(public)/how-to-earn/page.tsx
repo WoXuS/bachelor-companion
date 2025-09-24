@@ -18,6 +18,12 @@ export default function HowToEarnPage() {
                     </div>
                 </li>
                 <li className="flex gap-2 text-sm justify-between items-center rounded-lg border border-slate-700/60 bg-gradient-to-br from-slate-900/60 to-slate-900/30 p-3 shadow-sm">
+                    <p>Udział w pojedynkach</p>
+                    <p className="text-xs text-slate-400 border-l-2 border-primary pl-3">
+                        między graczami
+                    </p>
+                </li>
+                <li className="flex gap-2 text-sm justify-between items-center rounded-lg border border-slate-700/60 bg-gradient-to-br from-slate-900/60 to-slate-900/30 p-3 shadow-sm">
                     <p className="text-transparent animate-gradient">Hazard</p>
                     <p className="text-xs text-slate-400 border-l-2 border-primary pl-3">
                         między graczami

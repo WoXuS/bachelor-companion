@@ -87,11 +87,11 @@ export default function RankingPage() {
                             />
                             {p.name === "Antoni" &&
                                 <VirtualEggButton placementKey="ranking-first"
-                                                  className="absolute right-[47%] top-[60%] transform-[translate(-50%,-50%)] z-20 opacity-50"/>
+                                                  className="absolute right-[47%] top-[60%] transform-[translate(-50%,-50%)] z-20 opacity-10"/>
                             }
                             {p.name === "Borys" &&
                                 <VirtualEggButton placementKey="ranking-last"
-                                                  className="absolute right-[40%] top-[50%] transform-[translate(-50%,-50%)] z-20 opacity-50"/>
+                                                  className="absolute right-[40%] top-[50%] transform-[translate(-50%,-50%)] z-20 opacity-10"/>
                             }
                             <p className="flex flex-col gap-0.5">
                                 <span className="font-medium">{p.name}</span>
