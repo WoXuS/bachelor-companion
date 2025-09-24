@@ -3,13 +3,13 @@ import React from "react";
 
 export async function generateMetadata(): Promise<Metadata> {
     return {
-        title: 'Transakcje',
-        description: 'Historia transakcji',
-        openGraph: { title: 'Transakcje', type: 'website' },
+        title: 'Historia punktów',
+        description: 'Historia wszystkich transakcji',
+        openGraph: { title: 'Historia punktów', type: 'website' },
         robots: { index: true, follow: true },
     };
 }
 
-export default function TrasactionsLayout({ children }: { children: React.ReactNode }) {
+export default function DuelLayout({ children }: { children: React.ReactNode }) {
     return children;
 }

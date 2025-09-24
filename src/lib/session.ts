@@ -1,9 +1,15 @@
+import {NextRequest} from "next/server";
 import { cookies } from 'next/headers'
+
+export async function isAdminServer(): Promise<boolean> {
+    const store = await cookies()
+    return store.get(ADMIN_COOKIE)?.value === '1'
+}
 
 export const ADMIN_COOKIE = 'sb_admin'
 
-export function isAdminServer(): boolean {
-    return cookies().get(ADMIN_COOKIE)?.value === '1'
+export function isAdminFromRequest(req: NextRequest): boolean {
+    return req.cookies.get(ADMIN_COOKIE)?.value === '1'
 }
 
 export const adminCookieOptions = {
@@ -11,5 +17,5 @@ export const adminCookieOptions = {
     sameSite: 'lax' as const,
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: 60 * 60 * 12, // 12h
+    maxAge: 60 * 60 * 12,
 }

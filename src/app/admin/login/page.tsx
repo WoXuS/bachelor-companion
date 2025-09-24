@@ -1,15 +1,13 @@
 import {redirect} from 'next/navigation'
 import LoginForm from '@/components/auth/LoginForm'
 import {isAdminServer} from '@/lib/session'
-import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
-import React from "react";
+import VirtualEggButton from '@/components/easter-egg/VitualEggButton'
 
 export const dynamic = 'force-dynamic'
 
-export default function AdminLoginPage() {
-    if (isAdminServer()) {
-        redirect('/admin')
-    }
+export default async function AdminLoginPage() {
+    const isAdmin = await isAdminServer()
+    if (isAdmin) redirect('/admin')
 
     return (
         <div className="min-h-[100dvh] grid place-items-center px-4">
@@ -20,7 +18,6 @@ export default function AdminLoginPage() {
                 <VirtualEggButton placementKey="admin-page" className="mx-auto mt-5"/>
             </div>
             <VirtualEggButton placementKey="admin-page-2" className="ml-300 absolute bottom-0 "/>
-
         </div>
     )
 }

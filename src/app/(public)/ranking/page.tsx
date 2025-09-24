@@ -10,7 +10,6 @@ import {CustomLoader} from '@/components/ui/CustomLoader'
 import {ParticipantDto} from "@/types/participant";
 import {getAdmin} from "@/hooks/useAdmin";
 import {Receipt} from "lucide-react";
-import Link from "next/link";
 import {toast} from "sonner";
 import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
 
@@ -107,7 +106,7 @@ export default function RankingPage() {
 
 
                         </div>
-                        <Link href={`/transactions/${p.id}`} className="flex items-center gap-2 pr-3">
+                        <div className="flex items-center gap-2 pr-3">
                             <div
                                 className={`bg-primary-foreground/70 rounded-md px-3  ${p.balance > 999 ? 'text-sm py-2' : 'text-md py-1'} font-bold flex gap-[5px] items-center`}>
                                 <p>{p.balance}</p>
@@ -116,7 +115,7 @@ export default function RankingPage() {
                             {isAdmin &&
                                 <AddPointsDialog participantId={p.id} mutate={mutation.mutate}/>
                             }
-                        </Link>
+                        </div>
                     </li>
                 ))}
             </ul>

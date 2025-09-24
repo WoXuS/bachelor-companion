@@ -1,12 +1,12 @@
 import {NextResponse} from 'next/server'
 import type {NextRequest} from 'next/server'
-import {isAdminServer} from '@/lib/session'
+import {isAdminFromRequest} from '@/lib/session'
 
 export const config = {
     matcher: ['/admin/:path*', '/api/:path*'],
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
     const {pathname} = req.nextUrl
 
     const isLoginPage = pathname === '/admin/login'
@@ -15,11 +15,11 @@ export function middleware(req: NextRequest) {
     if (isLoginPage || isAuthRoute) {
         return NextResponse.next()
     }
-
+    const isAdmin = isAdminFromRequest(req)
     const isAdminRoute = pathname.startsWith('/admin')
     const isMutationApi = pathname.startsWith('/api') && req.method !== 'GET' && (!pathname.includes('claim') && !pathname.includes('easter-eggs'))
 
-    if ((isAdminRoute || isMutationApi) && !isAdminServer()) {
+    if ((isAdminRoute || isMutationApi) && !isAdmin) {
         if (isAdminRoute) {
             const url = req.nextUrl.clone()
             url.pathname = '/admin/login'

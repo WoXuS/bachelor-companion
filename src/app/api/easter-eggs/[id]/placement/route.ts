@@ -1,13 +1,13 @@
-import { NextResponse } from 'next/server'
+import {NextRequest, NextResponse} from 'next/server'
 import { prisma } from '@/server/db/prisma'
-import { isAdminServer } from '@/lib/session'
+import {isAdminFromRequest} from '@/lib/session'
 import {errMsg} from "@/lib/error";
 import {Ctx, getParams} from "@/types/api";
 
-export async function PUT(req: Request, ctx: Ctx<{ id: string }>) {
+export async function PUT(req: NextRequest, ctx: Ctx<{ id: string }>) {
     try {
         const { id } = await getParams(ctx)
-        if (!isAdminServer()) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        if (!isAdminFromRequest(req)) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
         const { placementKey } = await req.json() as { placementKey?: string | null }
 
         if (placementKey) {

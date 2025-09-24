@@ -6,8 +6,9 @@ import EasterEggsAdmin from "@/app/admin/EasterEggsAdmin";
 import Link from "next/link";
 import {Button} from "@/components/ui/button";
 
-export default function AdminPage() {
-    if (!isAdminServer()) redirect('/admin/login')
+export default async function AdminPage() {
+    const isAdmin = await isAdminServer()
+    if (!isAdmin) redirect('/admin/login')
 
     return (
         <div className="max-w-3xl mx-auto p-6 space-y-8 pt-20">

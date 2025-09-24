@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server'
-import { isAdminServer } from '@/lib/session'
+import {NextRequest, NextResponse} from 'next/server'
+import {isAdminFromRequest} from '@/lib/session'
 
-export function GET() {
-    return NextResponse.json({ isAdmin: isAdminServer() })
+export function GET(req: NextRequest) {
+    return NextResponse.json({ isAdmin: isAdminFromRequest(req) })
 }

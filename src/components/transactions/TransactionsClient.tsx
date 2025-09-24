@@ -2,7 +2,7 @@
 
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
 import {redirect, useRouter} from 'next/navigation'
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 import {Button} from '@/components/ui/button'
 import {
     Select,
@@ -67,7 +67,7 @@ export default function TransactionsClient({
     const [order, setOrder] = useState<'asc' | 'desc'>(initialOrder)
     const {data: me} = useQuery({queryKey: ['me'], queryFn: getAdmin})
     const isAdmin = !!me?.isAdmin
-    const [selected, setSelected] = useState<string | undefined>(participantId ?? undefined)
+    const [selected, setSelected] = useState<string>('')
 
     const {data: txs = [], isLoading} = useQuery({
         queryKey: ['transactions', participantId, order],
@@ -99,10 +99,11 @@ export default function TransactionsClient({
         },
         onError: (e) => toast.error(errMsg(e)),
     })
-
+    useEffect(() => {
+        setSelected(participantId ?? '')
+    }, [participantId])
 
     if (isLoading) return <CustomLoader/>
-
     return (
         <div className="max-w-3xl mx-auto p-6 pt-20 flex flex-col gap-6">
             <h1 className="text-2xl font-bold">Historia punktów</h1>
@@ -122,7 +123,7 @@ export default function TransactionsClient({
                 </Select>
                 <Select onValueChange={(p) => {
                     setSelected(p)
-                    redirect(`/transactions/${p}`)
+                    router.push(p ? `/transactions/${p}` : '/transactions')
                 }} value={selected}>
                     <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Wybierz uczestnika"/>
