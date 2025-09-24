@@ -110,7 +110,7 @@ export default function EasterEggsAdmin() {
 
                         <div className="flex items-center gap-2">
                             <Button asChild variant="secondary">
-                                <Link href={`/easter-egg/${e.id}`}>Otwórz</Link>
+                                <Link href={`/easter-egg/${e.code}`}>Otwórz</Link>
                             </Button>
                             {!e.active && (
                                 <Button

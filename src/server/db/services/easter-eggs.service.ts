@@ -1,10 +1,11 @@
 import {prisma} from '@/server/db/prisma'
+import { Prisma } from "@prisma/client";
 
 const EGG_POINTS = 50
 
 type Counts = { total: number; found: number; remaining: number }
 
-async function countsForType(tx: typeof prisma, type: 'PHYSICAL' | 'VIRTUAL'): Promise<Counts> {
+async function countsForType(tx: Prisma.TransactionClient, type: 'PHYSICAL' | 'VIRTUAL'): Promise<Counts> {
     const total = await tx.easterEgg.count({where: {type}})
     const found = await tx.easterEgg.count({where: {type, active: false}})
     const remaining = total - found

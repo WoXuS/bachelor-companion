@@ -122,7 +122,7 @@ function ActiveVirtualEggButton({
     const claimMut = useMutation({
         mutationFn: () => claimEgg(id, selected),
         onSuccess: () => {
-            toast.success('Przyznano 50 $pruch')
+            toast.success('Przyznano 20 $pruch')
             qc.invalidateQueries({queryKey: ['egg', id]})
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({ queryKey: ['egg-slot', placementKey] })
@@ -141,7 +141,7 @@ function ActiveVirtualEggButton({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        🎉 Przyczajony Kawaler 🎉
+                        🎉 Przyczajony Kawaler 🎉 {egg && <span className="text-gray-500 text-base">#{egg.number}</span>}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -154,15 +154,14 @@ function ActiveVirtualEggButton({
                         <p className="text-destructive">To jajko jest już nieaktywne.</p>
                         <p className="text-xs text-muted-foreground">
                             Możesz też przejść do strony: <Link className="underline"
-                                                                href={`/easter-egg/${id}`}>/easter-egg/{id}</Link>
+                                                                href={`/easter-egg/${egg.code}`}>/easter-egg/{egg.code}</Link>
                         </p>
                     </div>
                 ) : (
                     <div className="space-y-3">
                         <p className="text-sm">
                             Gratulacje! Znalazłeś easter egga - <i
-                            className="text-gray-400">"{egg.label ?? 'wirtualnego'}"</i> - numer
-                            #{egg.number}.
+                            className="text-gray-400">"{egg.label ?? 'wirtualnego'}"</i>
                         </p>
                         <p className="text-sm">
                             Wartość: <strong className="text-primary">50 $pruch</strong>. Wybierz poniżej kim jesteś aby

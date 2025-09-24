@@ -1,4 +1,5 @@
 export type EasterEggDto = {
+    code: string
     id: string
     number: number
     type: 'PHYSICAL' | 'VIRTUAL'

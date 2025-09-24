@@ -4,7 +4,6 @@ const prisma = new PrismaClient()
 
 import {createHash} from "crypto"
 
-
 const NAMESPACE_V1 = "EASTER_EGG_NAMESPACE_v1"
 
 function base36FromHexPrefix(hex: string, bytes: number) {
@@ -28,20 +27,39 @@ function pad(n: number, width = 3) {
 }
 
 export async function seedEasterEggs() {
+    for (let i = 1; i <= 15; i++) {
+        const num = i + 100;
+        await prisma.easterEgg.upsert({
+            where: {number: num},
+            update: {},
+            create: {
+                number: num,
+                type: "PHYSICAL",
+                code: codeForEgg(i, "PHYSICAL", 7),
+                label: `Fizyczny #${pad(i)}`,
+                active: true,
+            },
+        })
+    }
+
     const virtuals = [
-        { number: 1, label: "Jajo dla czytających do końca", placementKey: "shop" },
-        { number: 2, label: "Zostało mi już tylko jedno", placementKey: "ranking-last" },
-        { number: 3, label: "Ups, a skąd to się tu wzięło (czaicie, bo egg to jajo. Tea bag, hehe)", placementKey: "ranking-first" },
-        { number: 4, label: "Jajo dla grzebiących na stronie", placementKey: "admin-page" },
-        { number: 5, label: "Jajo dla bardzo grzebiących na stronie", placementKey: "admin-page-2" },
-        { number: 6, label: "Jajo dla czytających do końca", placementKey: "how-to-earn" },
-        { number: 7, label: "Jajo dla eksploratora strony", placementKey: "duels" },
-        { number: 8, label: "Damn, chłop już drabinkę przegranych przegląda", placementKey: "losers" },
+        {number: 1, label: "Jajo dla czytających do końca", placementKey: "shop"},
+        {number: 2, label: "Zostało mi już tylko jedno", placementKey: "ranking-last"},
+        {
+            number: 3,
+            label: "Ups, a skąd to się tu wzięło (czaicie, bo egg to jajo. Tea bag, hehe)",
+            placementKey: "ranking-first"
+        },
+        {number: 4, label: "Jajo dla grzebiących na stronie", placementKey: "admin-page"},
+        {number: 5, label: "Jajo dla bardzo grzebiących na stronie", placementKey: "admin-page-2"},
+        {number: 6, label: "Jajo dla czytających do końca", placementKey: "how-to-earn"},
+        {number: 7, label: "Jajo dla eksploratora strony", placementKey: "duels"},
+        {number: 8, label: "Damn, chłop już drabinkę przegranych przegląda", placementKey: "losers"},
     ]
     for (const v of virtuals) {
         await prisma.easterEgg.upsert({
-            where: { number: v.number },
-            update: { placementKey: v.placementKey ?? null },
+            where: {number: v.number},
+            update: {placementKey: v.placementKey ?? null},
             create: {
                 number: v.number,
                 type: "VIRTUAL",
@@ -49,20 +67,6 @@ export async function seedEasterEggs() {
                 label: v.label,
                 active: true,
                 placementKey: v.placementKey,
-            },
-        })
-    }
-
-    for (let i = 1; i <= 15; i++) {
-        await prisma.easterEgg.upsert({
-            where: { number: i },
-            update: {},
-            create: {
-                number: i+100,
-                type: "PHYSICAL",
-                code: codeForEgg(i, "PHYSICAL", 7),
-                label: `Fizyczny #${pad(i)}`,
-                active: true,
             },
         })
     }
@@ -180,9 +184,9 @@ async function main() {
             })
         })
 
-        if(bestman){
+        if (bestman) {
             await prisma.shopConfig.upsert({
-                where: { id: 'singleton' },
+                where: {id: 'singleton'},
                 update: {
                     groomParticipantId: groom?.id ?? null,
                     audienceExcludeIds: (groom?.id && bestman?.id) ? [groom.id, bestman.id] : (groom?.id ? [groom.id] : []),
@@ -195,39 +199,73 @@ async function main() {
                     audienceExcludeIds: (groom?.id && bestman?.id) ? [groom.id, bestman.id] : (groom?.id ? [groom.id] : []),
                 },
             })
+            const audienceQuestions =[
+                'Kim Antoni chciał być jak był mały?',
+                'Jaki Antoni ma rozmiar buta?',
+                'Jaki był najbardziej szalony/impulsywny zakup Antoniego?',
+                'Jakie jest ulubione śniadanie Antoniego?',
+                'Jakie są wymarzone wakacje Antoniego?',
+                'Ile Antoni chciałby mieć dzieci?',
+                'Jaki jest ulubiony film Antoniego?',
+                'Jaka jest ulubiona bajka z dzieciństwa Antoniego?',
+                'Jaki jest ulubiony kolor Antoniego?',
+                'Jaką supermoc wybrałby Antoni?',
+                'Jaki jest wymarzony samochód Antoniego?',
+            ]
 
-            const groomQs = Array.from({ length: 12 }).map((_, i) => ({
+            const groomQuestions = [
+                'Jaka jest ulubiona piosenka Niny?',
+                'Jakie są ulubione kwiaty Niny?',
+                'Gdzie była wasza pierwsza randka?',
+                'Jaka jest ulubiona potrawa Niny?',
+                'Co Nina kolekcjonowała w dzieciństwie?',
+                'Jaki jest największy lęk Niny?',
+                'Jaka jest ulubiona bajka Disneya Niny?',
+                'Co Nina najbardziej w Tobie lubi?',
+                'Jakiego nawyku nie lubi w Tobie Nina?',
+                'Jaki daliście sobie prezent na pierwszą rocznicę?',
+                'Kim Nina chciała zostać za dzieciaka?',
+                'Jakie jest wasze wspólne marzenie na najbliższe lata?',
+                'Jakie jest wasze wspólne marzenie na najbliższe lata? (z pominięciem domu)'
+            ]
+            const groomQs = groomQuestions.map((question, i) => ({
                 kind: 'GROOM' as const,
                 number: i + 1,
-                text: `Pytanie do pana młodego #${i + 1}`,
-                audioUrl: `/audio/groom/${i + 1}.mp3`,
+                text: question,
+                audioUrl: `/audio/groom/question-${i + 1}.mp3`,
             }))
             for (const q of groomQs) {
                 await prisma.quizQuestion.upsert({
-                    where: { kind_number: { kind: 'GROOM', number: q.number } },
-                    update: { text: q.text, audioUrl: q.audioUrl, active: true, answeredAt: null, groomCorrect: null },
+                    where: {kind_number: {kind: 'GROOM', number: q.number}},
+                    update: {text: q.text, audioUrl: q.audioUrl, active: true, answeredAt: null, groomCorrect: null},
                     create: q,
                 })
             }
 
-            const audienceQs = Array.from({ length: 12 }).map((_, i) => ({
+            const audienceQs = audienceQuestions.map((question, i) => ({
                 kind: 'AUDIENCE' as const,
                 number: i + 1,
-                text: `Pytanie do publiki #${i + 1}`,
-                audioUrl: `/audio/audience/${i + 1}.mp3`,
+                text: question,
+                audioUrl: `/audio/audience/question-${i + 1}.mp3`,
             }))
             for (const q of audienceQs) {
                 await prisma.quizQuestion.upsert({
-                    where: { kind_number: { kind: 'AUDIENCE', number: q.number } },
-                    update: { text: q.text, audioUrl: q.audioUrl, active: true, answeredAt: null, awardedParticipantId: null },
+                    where: {kind_number: {kind: 'AUDIENCE', number: q.number}},
+                    update: {
+                        text: q.text,
+                        audioUrl: q.audioUrl,
+                        active: true,
+                        answeredAt: null,
+                        awardedParticipantId: null
+                    },
                     create: q,
                 })
             }
 
             await prisma.quizMeta.upsert({
-                where: { id: 'singleton' },
-                update: { audienceBonusGranted: false },
-                create: { id: 'singleton', audienceBonusGranted: false },
+                where: {id: 'singleton'},
+                update: {audienceBonusGranted: false},
+                create: {id: 'singleton', audienceBonusGranted: false},
             })
         }
     }
