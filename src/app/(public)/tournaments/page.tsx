@@ -16,6 +16,7 @@ import {ChevronRight, Crown, Trash2} from "lucide-react";
 import {EditDuelDialog} from "@/app/(public)/tournaments/components/EditDuelDialog";
 import * as React from "react";
 import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
+import {errMsg} from "@/lib/error";
 
 async function fetchTournaments(): Promise<TournamentListItemDto[]> {
     const res = await fetch('/api/tournaments')
@@ -65,17 +66,21 @@ export default function TournamentsPage() {
     const [tab, setTab] = useState<'tournaments' | 'duels'>('tournaments')
 
     const createTournamentMut = useMutation({
-        mutationFn: createTournament, onSuccess: () => {
+        mutationFn: createTournament,
+        onSuccess: () => {
             toast.success('Turniej utworzony');
             qc.invalidateQueries({queryKey: ['tournaments']})
-        }, onError: (e: any) => toast.error(e.message)
+        },
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const createDuelMut = useMutation({
-        mutationFn: createDuel, onSuccess: () => {
+        mutationFn: createDuel,
+        onSuccess: () => {
             toast.success('Pojedynek dodany');
             qc.invalidateQueries({queryKey: ['duels']})
-        }, onError: (e: any) => toast.error(e.message)
+        },
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const deleteTournamentMut = useMutation({
@@ -89,7 +94,7 @@ export default function TournamentsPage() {
             toast.success('Usunięto turniej i cofnięto jego transakcje')
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     if (tLoading || dLoading) return <CustomLoader/>

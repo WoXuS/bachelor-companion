@@ -1,5 +1,6 @@
 import {NextResponse} from 'next/server'
 import {purchaseFor} from "@/server/db/services/economy.service";
+import {errMsg} from "@/lib/error";
 
 export async function POST(req: Request) {
     try {
@@ -10,7 +11,7 @@ export async function POST(req: Request) {
 
         const tx = await purchaseFor(participantId, itemId)
         return NextResponse.json(tx)
-    } catch (err: any) {
-        return NextResponse.json({message: err?.message ?? 'Purchase failed'}, {status: 400})
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, {status: 400})
     }
 }

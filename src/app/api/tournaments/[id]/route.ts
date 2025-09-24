@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getTournament, deleteTournament } from '@/server/db/repositories/tournaments.repo'
 import { tournamentStarted } from '@/server/db/repositories/tournaments.repo'
 import { prisma } from '@/server/db/prisma'
+import {errMsg} from "@/lib/error";
 
 type Params = { params: { id: string } }
 
@@ -27,8 +28,8 @@ export async function PUT(req: Request, { params }: Params) {
 
         const updated = await prisma.tournament.update({ where: { id: params.id }, data })
         return NextResponse.json(updated)
-    } catch (e: any) {
-        return NextResponse.json({ message: e.message }, { status: 400 })
+    } catch (e: unknown) {
+        return NextResponse.json(errMsg(e), { status: 400 })
     }
 }
 
@@ -36,7 +37,7 @@ export async function DELETE(_: Request, { params }: Params) {
     try {
         const res = await deleteTournament(params.id)
         return NextResponse.json(res)
-    } catch (e: any) {
-        return NextResponse.json({ message: e.message ?? 'Delete failed' }, { status: 400 })
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
     }
 }

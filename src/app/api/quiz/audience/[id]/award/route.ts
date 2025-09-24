@@ -7,7 +7,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         if (!participantId) return NextResponse.json({ message: 'Missing participantId' }, { status: 400 })
         await awardAudience(params.id, participantId)
         return NextResponse.json({ ok: true })
-    } catch (e: any) {
-        return NextResponse.json({ message: e?.message ?? 'Failed' }, { status: 400 })
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
     }
 }

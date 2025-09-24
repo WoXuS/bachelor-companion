@@ -21,8 +21,9 @@ import {getAdmin} from '@/hooks/useAdmin'
 import {CustomLoader} from '@/components/ui/CustomLoader'
 import TeamVersusCardRow from "@/app/(public)/tournaments/[id]/components/TeamVersusCardRow";
 import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
+import {errMsg} from "@/lib/error";
 
-async function fetchTournament(id: string): Promise<TTournament & any> {
+async function fetchTournament(id: string): Promise<TTournament> {
     const res = await fetch(`/api/tournaments/${id}`)
     const data = await res.json()
     if (!res.ok) throw new Error(data?.message || 'Load failed')
@@ -88,7 +89,7 @@ export default function TournamentDetailPage() {
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['transactions']})
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const [tab, setTab] = React.useState<'WINNERS' | 'LOSERS'>('WINNERS')
@@ -108,7 +109,6 @@ export default function TournamentDetailPage() {
 
 
     const isSolo = tournament.type === TournamentType.SOLO
-    const isTeam = tournament.type === TournamentType.TEAM
 
     return (
         <div className={`max-w-5xl mx-auto pb-6 px-4 sm:px-6 ${isSolo ? 'space-y-6' : 'space-y-1'} pt-20`}>

@@ -1,5 +1,6 @@
 import {NextResponse} from 'next/server'
 import {prisma} from '@/server/db/prisma'
+import {errMsg} from "@/lib/error";
 
 type Params = { params: { id: string } }
 
@@ -59,7 +60,7 @@ export async function POST(_: Request, {params}: Params) {
         })
 
         return NextResponse.json(result)
-    } catch (e: any) {
-        return NextResponse.json({message: e.message ?? 'Revert failed'}, {status: 400})
+    } catch (e: unknown) {
+        return NextResponse.json({message: errMsg(e)}, {status: 400})
     }
 }

@@ -1,5 +1,6 @@
 import {NextResponse} from 'next/server'
 import {prisma} from '@/server/db/prisma'
+import {errMsg} from "@/lib/error";
 
 type Params = { params: { id: string } }
 
@@ -40,8 +41,8 @@ export async function PUT(req: Request, {params}: { params: { id: string } }) {
         )
 
         return NextResponse.json({ok: true})
-    } catch (e: any) {
-        return NextResponse.json({message: e.message}, {status: 400})
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, {status: 400})
     }
 }
 

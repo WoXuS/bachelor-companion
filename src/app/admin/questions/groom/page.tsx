@@ -7,6 +7,7 @@ import {toast} from 'sonner'
 import {CustomLoader} from '@/components/ui/CustomLoader'
 import AudioPlayer from '@/components/ui/AudioPlayer'
 import {PartyPopper, ThumbsDown} from "lucide-react";
+import {errMsg} from "@/lib/error";
 
 type NextQ = {
     question: { id: string; number: number; text: string; audioUrl?: string | null } | null
@@ -66,7 +67,7 @@ export default function GroomQuizPage() {
             qc.invalidateQueries({queryKey: ['quiz-groom-stats']})
             toast.success(vars.correct ? 'Dobrze! +20 $pruch' : 'Źle. Pij szota.')
         },
-        onError: (e: any) => toast.error(e?.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const undoMut = useMutation({
@@ -78,7 +79,7 @@ export default function GroomQuizPage() {
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['transactions']})
         },
-        onError: (e: any) => toast.error(e?.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     if (nextQ.isLoading || statsQ.isLoading) return <CustomLoader/>

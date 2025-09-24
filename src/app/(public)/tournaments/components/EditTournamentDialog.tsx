@@ -6,11 +6,12 @@ import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {MultiSelect} from '@/components/ui/multi-select'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {toast} from 'sonner'
 import {TTournament, TournamentType} from '@/types/tournament'
 import {ParticipantDto} from '@/types/participant'
 import {Cog, Trash2} from "lucide-react";
+import {CreateTournamentPayload, UpdateTournamentBasicsPayload, UpdateTournamentParticipantsPayload} from "@/types/api";
+import {errMsg} from "@/lib/error";
 
 async function fetchTournament(id: string): Promise<TTournament> {
     const r = await fetch(`/api/tournaments/${id}`)
@@ -92,11 +93,9 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
 
     const saveBasicsMut = useMutation({
         mutationFn: async () => {
-            const payload: any = {title, mainPrize}
-            if (!started) {
-                payload.matchWinPrize = matchWinPrize
-                payload.consolationPrize = consolationPrize
-            }
+            const payload: UpdateTournamentBasicsPayload = !started
+                ? {title, mainPrize, matchWinPrize, consolationPrize}
+                : {title, mainPrize}
             const r = await fetch(`/api/tournaments/${tournamentId}`, {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
@@ -110,30 +109,33 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
             toast.success('Zapisano podstawy');
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
-    const saveParticipantsMut = useMutation({
+    const saveParticipantsMut = useMutation<unknown, Error, void>({
         mutationFn: async () => {
             if (!t) throw new Error('Brak turnieju')
             if (started) throw new Error('Turniej już wystartował')
 
-            let body: any
-            if (t.type === TournamentType.SOLO) body = {participantIds}
-            else body = {teamA, teamB}
+            const body: UpdateTournamentParticipantsPayload =
+                t.type === TournamentType.SOLO
+                    ? {type: TournamentType.SOLO, participantIds}
+                    : {type: TournamentType.TEAM, teamA, teamB}
 
             const r = await fetch(`/api/tournaments/${tournamentId}/participants`, {
-                method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body),
             })
             const j = await r.json().catch(() => ({}))
             if (!r.ok) throw new Error(j?.message || 'Save failed')
             return j
         },
         onSuccess: () => {
-            toast.success('Zapisano uczestników');
+            toast.success('Zapisano uczestników')
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const deleteMut = useMutation({
@@ -148,7 +150,7 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
             setOpen(false)
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -178,7 +180,8 @@ export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
                         </div>
 
                         <div className="flex justify-end gap-2">
-                            <Button className="flex-2" onClick={() => saveBasicsMut.mutate()} disabled={saveBasicsMut.isPending}>Zapisz
+                            <Button className="flex-2" onClick={() => saveBasicsMut.mutate()}
+                                    disabled={saveBasicsMut.isPending}>Zapisz
                                 podstawy</Button>
                             <Button
                                 className="flex-1"

@@ -1,17 +1,19 @@
-// src/app/(public)/duels/[id]/components/EditDuelDialog.tsx
 'use client'
 
 import * as React from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { toast } from 'sonner'
-import { Cog, Trash2 } from 'lucide-react'
-import { ParticipantDto } from '@/types/participant'
-import { DuelDto } from '@/types/duel'
+import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
+import {Button} from '@/components/ui/button'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {toast} from 'sonner'
+import {Cog, Trash2} from 'lucide-react'
+import {ParticipantDto} from '@/types/participant'
+import {DuelDto} from '@/types/duel'
+import {errMsg} from "@/lib/error";
+
+export type CreateDuelInput = Pick<DuelDto, 'title' | 'stake' | 'playerAId' | 'playerBId' | 'bestOf'>
 
 async function fetchDuel(id: string): Promise<DuelDto> {
     const r = await fetch(`/api/duels/${id}`)
@@ -28,16 +30,16 @@ async function fetchParticipants(): Promise<ParticipantDto[]> {
 
 type BestOf = 1 | 3 | 5
 
-export function EditDuelDialog({ duelId }: { duelId: string }) {
+export function EditDuelDialog({duelId}: { duelId: string }) {
     const [open, setOpen] = React.useState(false)
     const qc = useQueryClient()
 
-    const { data: duel, isLoading } = useQuery({
+    const {data: duel, isLoading} = useQuery({
         enabled: open,
         queryKey: ['duel', duelId, 'edit'],
         queryFn: () => fetchDuel(duelId),
     })
-    const { data: participants = [] } = useQuery({
+    const {data: participants = []} = useQuery({
         enabled: open,
         queryKey: ['participants'],
         queryFn: fetchParticipants,
@@ -45,11 +47,9 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
 
     const started = React.useMemo(() => {
         if (!duel) return false
-        // uznajemy start gdy są jakiekolwiek punkty/rozstrzygnięcie
         return !!(duel.winnerId || duel.scoreA != null || duel.scoreB != null)
     }, [duel])
 
-    // local state
     const [title, setTitle] = React.useState('')
     const [stake, setStake] = React.useState<number>(0)
     const [playerAId, setPlayerAId] = React.useState<string>('')
@@ -65,7 +65,7 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
         setBestOf((duel.bestOf as BestOf) ?? 1)
     }, [duel])
 
-    const participantOptions = participants.map((p) => ({ value: p.id, label: p.name }))
+    const participantOptions = participants.map((p) => ({value: p.id, label: p.name}))
     const optionsForA = participantOptions.filter((o) => o.value !== playerBId)
     const optionsForB = participantOptions.filter((o) => o.value !== playerAId)
 
@@ -77,14 +77,11 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
                 if (!playerAId || !playerBId) throw new Error('Wybierz obu graczy')
                 if (playerAId === playerBId) throw new Error('Gracze muszą być różni')
             }
-            const payload: any = { title, stake }
-            if (!started) {
-                payload.playerAId = playerAId
-                payload.playerBId = playerBId
-            }
+
+            const payload: CreateDuelInput = {title, stake, playerAId, playerBId, bestOf}
             const r = await fetch(`/api/duels/${duelId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload),
             })
             const j = await r.json().catch(() => ({}))
@@ -95,15 +92,15 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
             toast.success('Zapisano pojedynek')
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const saveBestOfMut = useMutation({
         mutationFn: async (bo: BestOf) => {
             const r = await fetch(`/api/duels/${duelId}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bestOf: bo }),
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({bestOf: bo}),
             })
             const j = await r.json().catch(() => ({}))
             if (!r.ok) throw new Error(j?.message || 'BO update failed')
@@ -113,12 +110,12 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
             toast.success('Zmieniono BO')
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const deleteMut = useMutation({
         mutationFn: async () => {
-            const r = await fetch(`/api/duels/${duelId}`, { method: 'DELETE' })
+            const r = await fetch(`/api/duels/${duelId}`, {method: 'DELETE'})
             const j = await r.json().catch(() => ({}))
             if (!r.ok) throw new Error(j?.message || 'Delete failed')
             return j
@@ -128,14 +125,14 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
             setOpen(false)
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button variant="secondary" size="sm" className="h-full rounded-none">
-                    <Cog />
+                    <Cog/>
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
@@ -149,7 +146,7 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
                     <div className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <Label>Tytuł</Label>
-                            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+                            <Input value={title} onChange={(e) => setTitle(e.target.value)}/>
 
                             <Label>Stawka</Label>
                             <Input
@@ -159,13 +156,14 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
                                 inputMode="numeric"
                             />
 
-                            <Label>Gracz A {started && <span className="text-xs text-gray-400">(zablokowane po starcie)</span>}</Label>
+                            <Label>Gracz A {started &&
+                                <span className="text-xs text-gray-400">(zablokowane po starcie)</span>}</Label>
                             <Select
                                 disabled={started}
                                 value={playerAId || ''}
                                 onValueChange={(v) => setPlayerAId(v)}
                             >
-                                <SelectTrigger><SelectValue placeholder="Wybierz gracza A" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Wybierz gracza A"/></SelectTrigger>
                                 <SelectContent>
                                     {optionsForA.map((o) => (
                                         <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -173,13 +171,14 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
                                 </SelectContent>
                             </Select>
 
-                            <Label>Gracz B {started && <span className="text-xs text-gray-400">(zablokowane po starcie)</span>}</Label>
+                            <Label>Gracz B {started &&
+                                <span className="text-xs text-gray-400">(zablokowane po starcie)</span>}</Label>
                             <Select
                                 disabled={started}
                                 value={playerBId || ''}
                                 onValueChange={(v) => setPlayerBId(v)}
                             >
-                                <SelectTrigger><SelectValue placeholder="Wybierz gracza B" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder="Wybierz gracza B"/></SelectTrigger>
                                 <SelectContent>
                                     {optionsForB.map((o) => (
                                         <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -199,7 +198,7 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
                                 }}
                                 disabled={!!duel.winnerId}
                             >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="1">1</SelectItem>
                                     <SelectItem value="3">3</SelectItem>
@@ -226,7 +225,7 @@ export function EditDuelDialog({ duelId }: { duelId: string }) {
                                 }}
                                 disabled={deleteMut.isPending}
                             >
-                                <Trash2 size={24} />
+                                <Trash2 size={24}/>
                             </Button>
                         </div>
                     </div>

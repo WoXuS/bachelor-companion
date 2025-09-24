@@ -7,9 +7,16 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from "@
 import {Button} from "@/components/ui/button";
 import {TParticipant, TTournament} from "@/types/tournament";
 import {winnersOnly} from "@/app/(public)/tournaments/[id]/utils/bracketMeta";
+import {errMsg} from "@/lib/error";
+import type {
+    DraggableProvided,
+    DraggableStateSnapshot
+} from '@hello-pangea/dnd'
 
 function DraggableInPortal({provided, snapshot, children}: {
-    provided: any, snapshot?: any, children: React.ReactNode
+    provided: DraggableProvided
+    snapshot?: DraggableStateSnapshot
+    children: React.ReactNode
 }) {
     const child = (
         <div
@@ -22,7 +29,8 @@ function DraggableInPortal({provided, snapshot, children}: {
             {children}
         </div>
     )
-    return snapshot.isDragging ? createPortal(child, document.body) : child
+    if (snapshot)
+        return snapshot.isDragging ? createPortal(child, document.body) : child
 }
 
 export default function EditSeedingDialog({
@@ -126,7 +134,7 @@ export default function EditSeedingDialog({
             onSaved()
             qc.invalidateQueries({queryKey: ['tournament', tournament.id]})
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const handleSave = () => {

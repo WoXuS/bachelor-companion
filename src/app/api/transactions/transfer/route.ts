@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { transferBetween } from '@/server/db/services/economy.service'
+import {errMsg} from "@/lib/error";
 
 export async function POST(req: Request) {
     try {
@@ -10,7 +11,7 @@ export async function POST(req: Request) {
 
         const data = await transferBetween(fromId, toId, n, reason)
         return NextResponse.json(data)
-    } catch (err: any) {
-        return NextResponse.json({ message: err.message || 'Transfer failed' }, { status: 400 })
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
     }
 }

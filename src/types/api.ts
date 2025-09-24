@@ -21,6 +21,23 @@ export type CreateTournamentPayload =
     teamA: TeamInput
     teamB: TeamInput
 }
+type BasicsWhenStarted = {
+    title: string
+    mainPrize: number
+}
+
+type BasicsBeforeStart = BasicsWhenStarted & {
+    matchWinPrize: number
+    consolationPrize: number
+}
+
+export type UpdateTournamentBasicsPayload =
+    | BasicsWhenStarted
+    | BasicsBeforeStart
+
+export type UpdateTournamentParticipantsPayload =
+    | { type: TournamentType.SOLO; participantIds: string[] }
+    | { type: TournamentType.TEAM; teamA: TeamInput; teamB: TeamInput }
 
 export type ApiError = { message: string }
 

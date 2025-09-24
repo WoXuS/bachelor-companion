@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/server/db/prisma'
 import { isAdminServer } from '@/lib/session'
+import {errMsg} from "@/lib/error";
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -20,7 +21,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             select: { id: true, placementKey: true },
         })
         return NextResponse.json(updated)
-    } catch (e: any) {
-        return NextResponse.json({ message: e?.message ?? 'Failed' }, { status: 500 })
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, { status: 500 })
     }
 }

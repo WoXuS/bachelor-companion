@@ -9,6 +9,7 @@ import {CustomLoader} from '@/components/ui/CustomLoader'
 import {ParticipantDto} from '@/types/participant'
 import AudioPlayer from '@/components/ui/AudioPlayer'
 import {CheckCheck} from "lucide-react";
+import {errMsg} from "@/lib/error";
 
 type NextQ = {
     question: { id: string; number: number; text: string; audioUrl?: string | null } | null
@@ -96,7 +97,7 @@ export default function AudienceQuizPage() {
             await qc.invalidateQueries({queryKey: ['aud-standings']})
             setSelected('')
         },
-        onError: (e: any) => toast.error(e?.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const finalizeMut = useMutation({
@@ -112,7 +113,7 @@ export default function AudienceQuizPage() {
             qc.invalidateQueries({queryKey: ['transactions']})
             qc.invalidateQueries({queryKey: ['aud-standings']})
         },
-        onError: (e: any) => toast.error(e?.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const undoMut = useMutation({
@@ -124,7 +125,7 @@ export default function AudienceQuizPage() {
             qc.invalidateQueries({queryKey: ['transactions']})
             qc.invalidateQueries({queryKey: ['aud-standings']})
         },
-        onError: (e: any) => toast.error(e?.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     if (nextQ.isLoading || peopleQ.isLoading || cfgQ.isLoading) return <CustomLoader/>

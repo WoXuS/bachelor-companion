@@ -10,6 +10,7 @@ import {CustomLoader} from '@/components/ui/CustomLoader'
 import {ParticipantDto} from '@/types/participant'
 import {getAdmin} from '@/hooks/useAdmin'
 import {EasterEggDto} from "@/types/easter-egg";
+import {errMsg} from "@/lib/error";
 
 
 async function fetchEggByCode(code: string): Promise<EasterEggDto> {
@@ -69,7 +70,7 @@ export default function EasterEggByCodePage() {
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['transactions']})
         },
-        onError: (e: any) => toast.error(e?.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const reactivateMut = useMutation({
@@ -78,7 +79,7 @@ export default function EasterEggByCodePage() {
             toast.success('Przywrócono do gry')
             qc.invalidateQueries({queryKey: ['egg-by-code', code]})
         },
-        onError: (e: any) => toast.error(e?.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     if (isLoading || !egg) return <CustomLoader/>

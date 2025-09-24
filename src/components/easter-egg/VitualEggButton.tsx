@@ -9,6 +9,7 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {toast} from 'sonner'
 import {EasterEggDto} from "@/types/easter-egg";
+import {errMsg} from "@/lib/error";
 
 type Participant = { id: string; name: string }
 
@@ -130,7 +131,7 @@ function ActiveVirtualEggButton({
             setSelected('')
             setOpen(false)
         },
-        onError: (e: any) => toast.error(e?.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     return (

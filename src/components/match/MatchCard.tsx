@@ -8,6 +8,7 @@ import {toast} from 'sonner'
 import {TMatch, TTournament} from "@/types/tournament"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {RefreshCw} from "lucide-react"
+import {errMsg} from "@/lib/error";
 
 const winsNeeded = (bestOf?: number) => Math.ceil((bestOf ?? 1) / 2)
 
@@ -127,7 +128,7 @@ export function MatchCard({
             toast.success('Zmieniono BO');
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
     const resetMut = useMutation({
         mutationFn: () => resetMatch(),
@@ -135,7 +136,7 @@ export function MatchCard({
             toast.success('Cofnięto wynik');
             qc.invalidateQueries()
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const isLosers = (match.bracket ?? 'WINNERS') === 'LOSERS'

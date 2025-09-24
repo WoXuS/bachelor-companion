@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { finalizeAudienceBonus } from '@/server/db/services/quiz.service'
+import {errMsg} from "@/lib/error";
 
 export async function POST() {
     try {
         const res = await finalizeAudienceBonus()
         return NextResponse.json(res)
-    } catch (e: any) {
-        return NextResponse.json({ message: e?.message ?? 'Failed' }, { status: 400 })
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
     }
 }

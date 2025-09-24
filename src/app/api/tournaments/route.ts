@@ -1,6 +1,7 @@
 import {NextResponse} from 'next/server'
 import {listTournaments} from '@/server/db/repositories/tournaments.repo'
 import {createSoloTournamentCompact, createTeamTournament} from '@/server/db/services/tournaments.service'
+import {errMsg} from "@/lib/error";
 
 export async function GET() {
     const rows = await listTournaments()
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
             })
             return NextResponse.json(t)
         }
-    } catch (e: any) {
-        return NextResponse.json({message: e.message}, {status: 400})
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, {status: 400})
     }
 }

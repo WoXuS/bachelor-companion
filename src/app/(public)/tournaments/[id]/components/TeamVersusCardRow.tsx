@@ -2,6 +2,7 @@ import {TMatch, TTournament} from "@/types/tournament"
 import {useMutation, useQueryClient} from "@tanstack/react-query"
 import {toast} from "sonner"
 import {type PrizeBadge, VersusCard} from "@/components/match/VersusCard"
+import {errMsg} from "@/lib/error";
 
 function prizeForMatchUI(m: TMatch, t: TTournament, hasWinnersR0: boolean): PrizeBadge {
     const inWinners = (m.bracket ?? 'WINNERS') === 'WINNERS'
@@ -86,13 +87,13 @@ export default function TeamVersusCardRow({
     const boMut = useMutation({
         mutationFn: (bo: 1 | 3 | 5) => patchBestOf(match.id, bo),
         onSuccess: () => { toast.success('Zmieniono BO'); qc.invalidateQueries() },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const resetMut = useMutation({
         mutationFn: () => resetMatch(match.id),
         onSuccess: () => { toast.success('Cofnięto wynik'); qc.invalidateQueries() },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const winnerDoubledCount =

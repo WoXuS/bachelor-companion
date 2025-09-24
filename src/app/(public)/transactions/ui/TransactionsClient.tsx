@@ -21,6 +21,7 @@ import {CustomLoader} from "@/components/ui/CustomLoader";
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {RefreshCw, Trash2} from "lucide-react"
+import {errMsg} from "@/lib/error";
 
 async function fetchTransactions(participantId?: string, order: 'asc' | 'desc' = 'desc'): Promise<TransactionDto[]> {
     const q = new URLSearchParams()
@@ -85,7 +86,7 @@ export default function TransactionsClient({
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['ranking']})
         },
-        onError: (e: any) => toast.error(`Błąd: ${e.message}`),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const deleteMut = useMutation({
@@ -96,7 +97,7 @@ export default function TransactionsClient({
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['ranking']})
         },
-        onError: (e: any) => toast.error(e.message),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
 
@@ -259,7 +260,7 @@ function NewTransferDialog({participants}: { participants: ParticipantDto[] }) {
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['ranking']})
         },
-        onError: (e: any) => toast.error(`Błąd: ${e.message}`),
+        onError: (e) => toast.error(errMsg(e)),
     })
     const from = participants.find(p => p.id === fromId)
     const to = participants.find(p => p.id === toId)

@@ -15,6 +15,7 @@ import {CustomLoader} from "@/components/ui/CustomLoader"
 import {Cog, UserRoundPlus} from "lucide-react"
 import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
 import {Switch} from "@/components/ui/switch";
+import {errMsg} from "@/lib/error";
 
 type ShopItemView = ShopItemDto & {
     effectiveCost?: number
@@ -140,7 +141,7 @@ export default function HomePage() {
             qc.invalidateQueries({queryKey: ['participants']})
             qc.invalidateQueries({queryKey: ['ranking']})
         },
-        onError: (error: any) => toast.error(`Zakup niepomyślny: ${error.message}`),
+        onError: (e) => toast.error(`Zakup niepomyślny: ${errMsg(e)}`)
     })
 
     const save = useMutation({
@@ -149,7 +150,7 @@ export default function HomePage() {
             qc.invalidateQueries({queryKey: ['shop']})
             toast.success('Przedmiot zapisany')
         },
-        onError: (err: any) => toast.error(`Błąd przy zapisie: ${err.message}`),
+        onError: (e) => toast.error(`Błąd przy zapisie: ${errMsg(e)}`)
     })
 
     const del = useMutation({
@@ -158,7 +159,7 @@ export default function HomePage() {
             qc.invalidateQueries({queryKey: ['shop']})
             toast.success('Przedmiot usunięty')
         },
-        onError: (err: any) => toast.error(`Błąd przy usuwaniu: ${err.message}`),
+        onError: (e) => toast.error(`Błąd przy usuwaniu: ${errMsg(e)}`)
     })
 
     const headerBadge = useMemo(() => {
@@ -529,7 +530,7 @@ function AdminShopControls() {
             qc.invalidateQueries({queryKey: ['shop']})
             toast.success('Zapisano ustawienia sklepu')
         },
-        onError: (e: any) => toast.error(e?.message ?? 'Błąd zapisu'),
+        onError: (e) => toast.error(errMsg(e)),
     })
 
     const toggle = () => {

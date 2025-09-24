@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { listDuels } from '@/server/db/repositories/duels.repo'
 import { createDuel } from '@/server/db/services/duels.service'
+import {errMsg} from "@/lib/error";
 
 export async function GET() {
     const rows = await listDuels()
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
             playerBId: String(body.playerBId),
         })
         return NextResponse.json(d)
-    } catch (e: any) {
-        return NextResponse.json({ message: e.message }, { status: 400 })
+    } catch (e: unknown) {
+        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
     }
 }
