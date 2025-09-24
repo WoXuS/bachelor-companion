@@ -1,31 +1,33 @@
 import {NextResponse} from 'next/server'
 import {prisma} from '@/server/db/prisma'
 import {tournamentStarted} from '@/server/db/repositories/tournaments.repo'
+import {Ctx, getParams} from "@/types/api";
 
 type Params = { params: { id: string } }
 
-export async function PUT(req: Request, {params}: Params) {
+export async function PUT(req: Request, ctx: Ctx<{ id: string }>) {
+    const { id } = await getParams(ctx)
     const body = await req.json()
-    const t = await prisma.tournament.findUnique({where: {id: params.id}})
+    const t = await prisma.tournament.findUnique({where: {id: id}})
     if (!t) return NextResponse.json({message: 'Not found'}, {status: 404})
 
-    const started = await tournamentStarted(params.id)
+    const started = await tournamentStarted(id)
     if (started) return NextResponse.json({message: 'Turniej już wystartował'}, {status: 400})
 
     return prisma.$transaction(async (tx) => {
         if (t.type === 'SOLO') {
             const ids: string[] = Array.isArray(body.participantIds) ? body.participantIds : []
-            await tx.tournamentParticipant.deleteMany({where: {tournamentId: params.id}})
+            await tx.tournamentParticipant.deleteMany({where: {tournamentId: id}})
             if (ids.length) {
                 await tx.tournamentParticipant.createMany({
-                    data: ids.map(pid => ({tournamentId: params.id, participantId: String(pid)})),
+                    data: ids.map(pid => ({tournamentId: id, participantId: String(pid)})),
                 })
             }
         } else {
             const a = body.teamA as { name: string; memberIds: string[] }
             const b = body.teamB as { name: string; memberIds: string[] }
             const teams = await tx.tournamentTeam.findMany({
-                where: {tournamentId: params.id},
+                where: {tournamentId: id},
                 orderBy: {createdAt: 'asc'}
             })
             if (teams.length !== 2) return NextResponse.json({message: 'Oczekiwano 2 zespołów'}, {status: 400})

@@ -3,15 +3,17 @@ import {getTournament, deleteTournament} from '@/server/db/repositories/tourname
 import {tournamentStarted} from '@/server/db/repositories/tournaments.repo'
 import {prisma} from '@/server/db/prisma'
 import {errMsg} from "@/lib/error";
+import {Ctx, getParams} from "@/types/api";
 
 type Params = { params: { id: string } }
 
-export async function GET(_: Request, {params}: Params) {
-    const t = await getTournament(params.id)
+export async function GET(_req: Request, ctx: Ctx<{ id: string }>) {
+    const { id } = await getParams(ctx)
+
+    const t = await getTournament(id)
     if (!t) return NextResponse.json({message: 'Not found'}, {status: 404})
     return NextResponse.json(t)
 }
-
 
 type UpdateTournamentBasicsRequest = {
     title?: unknown
@@ -27,11 +29,12 @@ type UpdateTournamentBasicsData = Partial<
     >
 >
 
-export async function PUT(req: Request, {params}: Params) {
+export async function PUT(req: Request, ctx: Ctx<{ id: string }>) {
+    const { id } = await getParams(ctx)
     const body = (await req.json()) as UpdateTournamentBasicsRequest
 
     try {
-        const started = await tournamentStarted(params.id)
+        const started = await tournamentStarted(id)
 
         const data: UpdateTournamentBasicsData = {}
 
@@ -66,7 +69,7 @@ export async function PUT(req: Request, {params}: Params) {
         }
 
         const updated = await prisma.tournament.update({
-            where: {id: params.id},
+            where: {id: id},
             data,
         })
 
@@ -76,9 +79,10 @@ export async function PUT(req: Request, {params}: Params) {
     }
 }
 
-export async function DELETE(_: Request, {params}: Params) {
+export async function DELETE(_req: Request, ctx: Ctx<{ id: string }>) {
+    const { id } = await getParams(ctx)
     try {
-        const res = await deleteTournament(params.id)
+        const res = await deleteTournament(id)
         return NextResponse.json(res)
     } catch (e: unknown) {
         return NextResponse.json({message: errMsg(e)}, {status: 400})

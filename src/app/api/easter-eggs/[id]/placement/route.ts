@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/server/db/prisma'
 import { isAdminServer } from '@/lib/session'
 import {errMsg} from "@/lib/error";
+import {Ctx, getParams} from "@/types/api";
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, ctx: Ctx<{ id: string }>) {
     try {
+        const { id } = await getParams(ctx)
         if (!isAdminServer()) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
         const { placementKey } = await req.json() as { placementKey?: string | null }
 
@@ -16,7 +18,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         }
 
         const updated = await prisma.easterEgg.update({
-            where: { id: params.id },
+            where: { id: id },
             data: { placementKey: placementKey ?? null },
             select: { id: true, placementKey: true },
         })

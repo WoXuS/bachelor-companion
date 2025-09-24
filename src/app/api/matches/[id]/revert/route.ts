@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/server/db/prisma'
 import { Prisma } from '@prisma/client'
 import {errMsg} from "@/lib/error";
+import {Ctx, getParams} from "@/types/api";
 
-type Params = { params: { id: string } }
 type Tx = Prisma.TransactionClient
 
 async function revertDPUsageForMatch(tx: Tx, matchId: string) {
@@ -26,8 +26,8 @@ async function revertDPUsageForMatch(tx: Tx, matchId: string) {
     await tx.participantBuffUsage.deleteMany({ where: { matchId } })
 }
 
-export async function POST(req: Request, { params }: Params) {
-    const matchId = params.id
+export async function POST(_req: Request, ctx: Ctx<{ id: string }>) {
+    const { id: matchId } = await getParams(ctx)
 
     try {
         const result = await prisma.$transaction(async (tx) => {

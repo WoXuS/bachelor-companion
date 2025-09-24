@@ -1,14 +1,16 @@
 import {NextResponse} from 'next/server'
 import {prisma} from '@/server/db/prisma'
 import {errMsg} from "@/lib/error";
+import {Ctx, getParams} from "@/types/api";
 
-type Params = { params: { id: string } }
 
-export async function PUT(req: Request, {params}: { params: { id: string } }) {
+export async function PUT(req: Request, ctx: Ctx<{ id: string }>) {
     const {round = 1, pairs} = await req.json()
+    const { id } = await getParams(ctx)
+
     try {
         const editable = await prisma.match.findMany({
-            where: {tournamentId: params.id, round: round, bracket: 'WINNERS', isBye: false},
+            where: {tournamentId: id, round: round, bracket: 'WINNERS', isBye: false},
             select: {id: true, winnerParticipantId: true, scoreA: true, scoreB: true}
         })
 

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { reportMatch } from '@/server/db/services/tournaments.service'
 import {errMsg} from "@/lib/error";
+import {Ctx} from "@/types/api";
 
 type Params = { params: { id: string } }
 
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, _ctx: Ctx<{ id: string }>) {
     const { matchId, winner, scoreA, scoreB } = await req.json()
     try {
         await reportMatch({ matchId, winner, scoreA, scoreB })

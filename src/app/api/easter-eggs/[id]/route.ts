@@ -1,10 +1,12 @@
 import {NextResponse} from 'next/server'
 import {getEggByIdWithCounts} from '@/server/db/services/easter-eggs.service'
 import {errMsg} from "@/lib/error";
+import {Ctx, getParams} from "@/types/api";
 
-export async function GET(_req: Request, {params}: { params: { id: string } }) {
+export async function GET(_req: Request, ctx: Ctx<{ id: string }>) {
     try {
-        const res = await getEggByIdWithCounts(params.id)
+        const { id } = await getParams(ctx)
+        const res = await getEggByIdWithCounts(id)
         if (!res) return NextResponse.json({message: 'Nie znaleziono'}, {status: 404})
         const {egg, counts} = res
         return NextResponse.json({
