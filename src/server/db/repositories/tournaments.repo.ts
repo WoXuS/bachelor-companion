@@ -125,8 +125,8 @@ export async function getTournament(id: string): Promise<TTournament | null> {
     }
 
     const matchIds = t.matches.map(m => m.id)
-    let doubledByMatch: Record<string, boolean> = {}
-    let doubledByMatchAndParticipant: Record<string, Record<string, boolean>> = {}
+    const doubledByMatch: Record<string, boolean> = {}
+    const doubledByMatchAndParticipant: Record<string, Record<string, boolean>> = {}
     if (matchIds.length > 0) {
         const doubledTxs = await prisma.transaction.findMany({
             where: { matchId: { in: matchIds }, isDoubled: true },

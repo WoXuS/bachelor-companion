@@ -176,7 +176,7 @@ function ActiveVirtualEggButtonInner({
                 ) : (
                     <div className="space-y-3">
                         <p className="text-sm">
-                            Gratulacje! Znalazłeś easter egga - <i className="text-gray-400">"{egg.label ?? 'wirtualnego'}"</i>
+                            Gratulacje! Znalazłeś easter egga - <i className="text-gray-400">&quot;{egg.label ?? 'wirtualnego'}&quot;</i>
                         </p>
                         <p className="text-sm">
                             Wartość: <strong className="text-primary">50 $pruch</strong>. Wybierz poniżej kim jesteś aby odebrać swoje punkty.
