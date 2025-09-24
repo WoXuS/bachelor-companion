@@ -1,12 +1,11 @@
-import {NextResponse} from 'next/server'
+import {NextRequest, NextResponse} from 'next/server'
 import {prisma} from '@/server/db/prisma'
-import {errMsg} from "@/lib/error";
+import {errMsg} from '@/lib/error'
 
 type Params = { params: { id: string } }
 
-export async function POST(_: Request, {params}: Params) {
+export async function POST(_req: NextRequest, {params}: Params) {
     const duelId = params.id
-
     try {
         const result = await prisma.$transaction(async (tx) => {
             const txs = await tx.transaction.findMany({
@@ -30,9 +29,7 @@ export async function POST(_: Request, {params}: Params) {
                     const current = balanceById.get(participantId) ?? 0
                     const next = current + delta
                     if (next < 0) {
-                        throw new Error(
-                            `Nie można cofnąć – saldo uczestnika spadłoby poniżej zera (id=${participantId}).`
-                        )
+                        throw new Error(`Nie można cofnąć – saldo uczestnika spadłoby poniżej zera (id=${participantId}).`)
                     }
                 }
 
@@ -46,6 +43,16 @@ export async function POST(_: Request, {params}: Params) {
                 }
 
                 await tx.transaction.deleteMany({where: {matchId: duelId}})
+
+                return tx.duel.update({
+                    where: {id: duelId},
+                    data: {
+                        winnerId: null,
+                        scoreA: null,
+                        scoreB: null,
+                        finishedAt: null,
+                    },
+                })
             }
 
             return tx.duel.update({
@@ -56,7 +63,7 @@ export async function POST(_: Request, {params}: Params) {
                     scoreB: null,
                     finishedAt: null,
                 },
-            });
+            })
         })
 
         return NextResponse.json(result)
