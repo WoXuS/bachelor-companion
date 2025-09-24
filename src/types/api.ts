@@ -8,9 +8,7 @@ export type Ctx<T extends Record<string, string> = Record<string, string>> =
     | { params: Promise<T> }
 
 export async function getParams<T extends Record<string, string>>(ctx: Ctx<T>): Promise<T> {
-    // @ts-expect-error runtime check
     const p = ctx.params
-    // @ts-expect-error runtime check
     return typeof p?.then === 'function' ? await p : p
 }
 
