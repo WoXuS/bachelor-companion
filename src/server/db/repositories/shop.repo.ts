@@ -12,7 +12,13 @@ export function createShopItem(data: { key: string; label: string; cost: number;
     return prisma.shopItem.create({data})
 }
 
-export function updateShopItem(id: string, data: { label?: string; cost?: number; category?: string }) {
+export function updateShopItem(id: string, data: {
+    label?: string;
+    cost?: number;
+    category?: string,
+    adjustOverrideEnabled?: boolean
+    adjustPercent?: number
+}) {
     return prisma.shopItem.update({where: {id}, data})
 }
 

@@ -1,5 +1,5 @@
 import {prisma} from '../prisma'
-import {applyDiscountRounded, getShopConfig} from "@/server/db/services/pricing.service";
+import {computeEffectivePrice, getShopConfig} from "@/server/db/services/pricing.service";
 
 export async function addTransaction(participantId: string, amount: number, reason: string, matchId?: string, isDoubled?: boolean) {
     return prisma.$transaction(async (tx) => {
@@ -36,11 +36,11 @@ export async function purchaseFor(participantId: string, itemId: string) {
     if (!participant) throw new Error('Participant not found')
     if (!item) throw new Error('Item not found')
 
-    const price = applyDiscountRounded(
+    const {value: price, source, appliedPercent} = computeEffectivePrice(
         item.cost,
-        cfg.discountsEnabled,
-        cfg.discountPercent,
-        {mode: 'preferred'}
+        {enabled: cfg.discountsEnabled, percent: cfg.discountPercent},
+        {overrideEnabled: item.adjustOverrideEnabled, percent: item.adjustPercent},
+        'preferred'
     )
 
     return prisma.$transaction(async (tx) => {
@@ -56,11 +56,22 @@ export async function purchaseFor(participantId: string, itemId: string) {
             })
         }
 
-        await addTransaction(
-            participantId,
-            -price,
-            `Zakup: ${item.label}${cfg.discountsEnabled ? ` (-${cfg.discountPercent}%)` : ''}`
-        )
+        const reasonSuffix =
+            source === 'item'
+                ? ` (override ${appliedPercent > 0 ? '+' : ''}${appliedPercent}%)`
+                : source === 'global'
+                    ? ` (${appliedPercent}% )`
+                    : ''
+
+        await tx.transaction.create({
+            data: {
+                participantId,
+                amount: -price,
+                reason: `Zakup: ${item.label}${reasonSuffix}`,
+                balanceAfter: p.balance - price,
+            },
+        })
+        await tx.participant.update({where: {id: participantId}, data: {balance: p.balance - price}})
 
         return true
     })

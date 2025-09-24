@@ -13,26 +13,26 @@ enum QuizKind {
 }
 
 model QuizQuestion {
-  id           String    @id @default(cuid())
-  kind         QuizKind
-  number       Int
-  text         String
-  audioUrl     String?
-  active       Boolean   @default(true)
+  id       String   @id @default(cuid())
+  kind     QuizKind
+  number   Int
+  text     String
+  audioUrl String?
+  active   Boolean  @default(true)
 
-  answeredAt             DateTime?
-  groomCorrect           Boolean?
-  awardedParticipantId   String?
-  awardedParticipant     Participant? @relation(fields: [awardedParticipantId], references: [id])
+  answeredAt           DateTime?
+  groomCorrect         Boolean?
+  awardedParticipantId String?
+  awardedParticipant   Participant? @relation(fields: [awardedParticipantId], references: [id])
 
-  createdAt    DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([kind, number])
 }
 
 model QuizMeta {
-  id                       String   @id @default("singleton")
-  audienceBonusGranted     Boolean  @default(false)
+  id                   String  @id @default("singleton")
+  audienceBonusGranted Boolean @default(false)
 }
 
 enum EasterEggType {
@@ -116,6 +116,9 @@ model ShopItem {
   cost      Int
   category  String
   createdAt DateTime @default(now())
+
+  adjustOverrideEnabled Boolean @default(false)
+  adjustPercent         Int     @default(0)
 }
 
 enum TournamentType {

@@ -2,61 +2,107 @@ import {prisma} from '../prisma'
 
 export type RoundingMode = 'step' | 'preferred'
 
-export type RoundingOptions = {
-    mode?: RoundingMode
-    step?: 20 | 50 | 100
-    steps?: number[]
-    min?: number
-}
-
 export async function getShopConfig() {
     const cfg = await prisma.shopConfig.findUnique({where: {id: 'singleton'}})
     return cfg ?? {discountsEnabled: false, discountPercent: 20}
 }
 
-function roundToStep(value: number, step: number) {
-    if (step <= 0) return value
-    return Math.round(value / step) * step
+type RoundDir = 'down' | 'up' | 'nearest'
+type RoundMode = 'preferred' | 'nearest20'
+
+export function isReachableWithNotes(n: number): boolean {
+    if (n < 0) return false
+    if (n === 0) return true
+    if (n % 10 !== 0) return false
+    if (n === 10 || n === 30) return false
+    return true
 }
 
-function roundToPreferred(value: number, steps: number[]) {
-    const uniq = Array.from(new Set(steps.filter(s => s > 0))).sort((a, b) => b - a)
-    if (uniq.length === 0) return value
-    const candidates = uniq.map(step => {
-        const rounded = roundToStep(value, step)
-        return {step, rounded, diff: Math.abs(rounded - value)}
-    })
-    candidates.sort((a, b) => {
-        if (a.diff !== b.diff) return a.diff - b.diff
-        return b.step - a.step
-    })
-    return candidates[0].rounded
+
+export function roundToPreferred(amount: number, direction: RoundDir = 'nearest'): number {
+    if (amount < 0) return 0
+    const a = Math.round(amount)
+
+    if (isReachableWithNotes(a)) return a
+
+    const maxSpan = 200
+    const step = 1
+    if (direction === 'down') {
+        for (let d = 0; d <= maxSpan; d += step) {
+            const v = a - d
+            if (v < 0) return 0
+            if (isReachableWithNotes(v)) return v
+        }
+    } else if (direction === 'up') {
+        for (let d = 0; d <= maxSpan; d += step) {
+            const v = a + d
+            if (isReachableWithNotes(v)) return v
+        }
+    } else {
+        for (let d = 0; d <= maxSpan; d += step) {
+            const down = a - d
+            const up = a + d
+            const downOk = isReachableWithNotes(down)
+            const upOk = isReachableWithNotes(up)
+            if (downOk && upOk) return down
+            if (downOk) return down
+            if (upOk) return up
+        }
+    }
+    return a
+}
+
+export function roundNearest20(n: number): number {
+    if (n <= 0) return 0
+    return Math.round(n / 20) * 20
+}
+
+function applyPercent(base: number, percent: number): number {
+    return Math.round(base * (1 + percent / 100))
+}
+
+export function computeEffectivePrice(
+    baseCost: number,
+    global: { enabled: boolean; percent: number },
+    item: { overrideEnabled: boolean; percent: number },
+    mode: RoundMode = 'preferred'
+): { value: number; source: 'item' | 'global' | 'none'; appliedPercent: number } {
+    let applied = 0
+    let source: 'item' | 'global' | 'none' = 'none'
+
+    if (item.overrideEnabled && item.percent !== 0) {
+        applied = item.percent
+        source = 'item'
+    } else if (global.enabled && global.percent > 0) {
+        applied = -global.percent
+        source = 'global'
+    }
+
+    const raw = applied ? applyPercent(baseCost, applied) : baseCost
+    const dir: RoundDir = applied < 0 ? 'down' : applied > 0 ? 'up' : 'nearest'
+
+    let value = raw
+    if (mode === 'preferred') {
+        value = roundToPreferred(raw, dir)
+    } else {
+        value = roundNearest20(raw)
+    }
+    if (value < 0) value = 0
+
+    return {value, source, appliedPercent: applied}
 }
 
 export function applyDiscountRounded(
-    base: number,
-    enabled: boolean,
-    percent: number,
-    opts: RoundingOptions = {}
-) {
-    const mode = opts.mode ?? 'preferred'
-    const steps = opts.steps ?? [100, 50, 20]
-    const step = opts.step ?? 20
-    const minAllowed = opts.min ?? Math.min(...steps)
-
-    const mult = enabled ? (100 - percent) : 100
-    const raw = Math.round((base * mult) / 100)
-
-    let rounded = raw
-    if (mode === 'step') {
-        rounded = roundToStep(raw, step)
-    } else {
-        rounded = roundToPreferred(raw, steps)
-    }
-
-    return Math.max(minAllowed, rounded)
-}
-
-export function applyDiscountRound20(base: number, enabled: boolean, percent: number) {
-    return applyDiscountRounded(base, enabled, percent, {mode: 'step', step: 20})
+    baseCost: number,
+    discountsEnabled: boolean,
+    discountPercent: number,
+    opts?: { mode?: RoundMode }
+): number {
+    const {value} = computeEffectivePrice(
+        baseCost,
+        {enabled: discountsEnabled, percent: discountPercent},
+        {overrideEnabled: false, percent: 0},
+        opts?.mode ?? 'preferred'
+    )
+    return value
 }

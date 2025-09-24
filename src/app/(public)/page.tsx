@@ -14,6 +14,7 @@ import {toast} from "sonner"
 import {CustomLoader} from "@/components/ui/CustomLoader"
 import {Cog, UserRoundPlus} from "lucide-react"
 import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
+import {Switch} from "@/components/ui/switch";
 
 type ShopItemView = ShopItemDto & {
     effectiveCost?: number
@@ -60,7 +61,8 @@ async function purchase(participantId: string, itemId: string) {
         try {
             const data = await res.json()
             if (data?.message) message = data.message
-        } catch {}
+        } catch {
+        }
         throw new Error(message)
     }
     return res.json()
@@ -78,7 +80,8 @@ async function upsertShopItem(data: Partial<ShopItemDto>) {
         try {
             const j = await res.json()
             if (j?.message) message = j.message
-        } catch {}
+        } catch {
+        }
         throw new Error(message)
     }
     return res.json()
@@ -91,7 +94,8 @@ async function removeShopItem(id: string) {
         try {
             const j = await res.json()
             if (j?.message) message = j.message
-        } catch {}
+        } catch {
+        }
         throw new Error(message)
     }
     return res.json()
@@ -161,13 +165,15 @@ export default function HomePage() {
         if (!cfg) return null
         if (!cfg.discountsEnabled) {
             return (
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-600/50 bg-slate-800/50 px-2 py-0.5 text-xs text-slate-300">
+                <span
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-600/50 bg-slate-800/50 px-2 py-0.5 text-xs text-slate-300">
           Ceny standardowe
         </span>
             )
         }
         return (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
+            <span
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
         Obniżka −{cfg.discountPercent}%
       </span>
         )
@@ -197,10 +203,16 @@ export default function HomePage() {
                             <div className="flex min-w-0 flex-col gap-2 py-3">
                                 <div className="text-sm font-medium text-slate-100">
                                     <p>
-                                        {item.label}{" "}{" "}
-                                        <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase ${item.category !== 'troll' ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'} `}>
+                                        {item.label}{" "}
+                                        <span
+                                            className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase ${item.category !== 'troll' ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'} `}>
                                             {item.category}
-                                    </span>
+                                    </span>{" "}
+                                        {isAdmin && <span
+                                            className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-300 border-amber-500/40 bg-amber-500/10">
+                                            {item.pricingSource}
+                                    </span>}
+
                                     </p>
 
                                 </div>
@@ -216,7 +228,8 @@ export default function HomePage() {
                           {item.cost} $pruch
                         </span>
                                             )}
-                                            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+                                            <span
+                                                className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
                         {prettyDeltaPercent(item.cost, effective)}
                       </span>
                                         </>
@@ -232,7 +245,8 @@ export default function HomePage() {
                           {item.cost} $pruch
                         </span>
                                             )}
-                                            <span className="rounded-full border border-rose-500/40 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-300">
+                                            <span
+                                                className="rounded-full border border-rose-500/40 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-300">
                         {prettyDeltaPercent(item.cost, effective)}
                       </span>
                                         </>
@@ -281,7 +295,8 @@ export default function HomePage() {
                     Osoby z największą liczbą <span className="text-primary">$pruch Dollarów</span> na koniec wyjazdu
                     wygrywają nagrody.
                 </p>
-                <h3 className="text-base font-bold">Po co wydawać <span className="text-primary">$pruch Dollary</span>?</h3>
+                <h3 className="text-base font-bold">Po co wydawać <span className="text-primary">$pruch Dollary</span>?
+                </h3>
                 <p className="text-slate-300">
                     Teoretycznie można kisić Dollary, ale jeśli widzisz, że ktoś tuż za Tobą może wygrać mini-grę,
                     użyj sklepu, żeby to zneutralizować i utrzymać prowadzenie. Sprawdź{' '}
@@ -319,7 +334,7 @@ function PurchaseDialog({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" className="h-full rounded-none rounded-e-lg"><UserRoundPlus /></Button>
+                <Button size="sm" className="h-full rounded-none rounded-e-lg"><UserRoundPlus/></Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
@@ -386,6 +401,8 @@ function AddEditItemDialog({
     const [label, setLabel] = useState(shopItem?.label ?? '')
     const [cost, setCost] = useState(shopItem?.cost ?? 20)
     const [category, setCategory] = useState(shopItem?.category ?? '')
+    const [override, setOverride] = useState<boolean>(!!shopItem?.adjustOverrideEnabled)
+    const [overridePct, setOverridePct] = useState<number>(shopItem?.adjustPercent ?? 0)
 
     function onOpenChange(v: boolean) {
         setOpen(v)
@@ -400,7 +417,8 @@ function AddEditItemDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
-                <Button size="sm" variant={shopItem ? 'secondary' : 'default'} className={shopItem ? 'h-full rounded-none' : 'w-full'}>
+                <Button size="sm" variant={shopItem ? 'secondary' : 'default'}
+                        className={shopItem ? 'h-full rounded-none' : 'w-full'}>
                     {shopItem ? <Cog/> : '+'}
                 </Button>
             </DialogTrigger>
@@ -428,6 +446,25 @@ function AddEditItemDialog({
                         placeholder="Klucz"
                         disabled={!!shopItem?.id}
                     />
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                            <div className="font-medium text-sm">Per-item zniżka/podwyżka</div>
+                            <p className="text-xs text-slate-400">Nadpisuje ustawienia globalne. Ujemne = zniżka,
+                                dodatnie = podwyżka.</p>
+                        </div>
+                        <Switch checked={override} onCheckedChange={setOverride}/>
+                    </div>
+                    {override && (
+                        <div className="flex items-center gap-2">
+                            <Input
+                                type="number"
+                                value={overridePct}
+                                onChange={e => setOverridePct(Number(e.target.value))}
+                                className="w-24"
+                            />
+                            <span className="text-sm text-slate-400">% (np. -20 lub 30)</span>
+                        </div>
+                    )}
                     <Select value={category ?? ''} onValueChange={setCategory}>
                         <SelectTrigger>
                             <SelectValue placeholder="Wybierz kategorię"/>
@@ -448,6 +485,8 @@ function AddEditItemDialog({
                                     cost: Number(cost) || 0,
                                     key,
                                     category: category || undefined,
+                                    adjustOverrideEnabled: override,
+                                    adjustPercent: override ? Math.round(overridePct) : 0,
                                 })
                                 setOpen(false)
                             }}
