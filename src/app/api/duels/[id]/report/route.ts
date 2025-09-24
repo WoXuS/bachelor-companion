@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { reportDuel, revertDuel } from '@/server/db/services/duels.service'
 import { errMsg } from '@/lib/error'
 
-type Params = { params: { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 const toNum = (v: unknown) => (v == null ? undefined : Number(v))
 
-export async function POST(req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, ctx: Ctx) {
     try {
-        const { id } = params
+        const { id } = await ctx.params
         const body = await req.json()
         const winner = body?.winner === 'A' ? 'A' : body?.winner === 'B' ? 'B' : null
         if (!winner) return NextResponse.json({ message: 'Invalid winner' }, { status: 400 })
@@ -25,9 +25,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(_req: NextRequest, ctx: Ctx) {
     try {
-        await revertDuel(params.id)
+        const { id } = await ctx.params
+        await revertDuel(id)
         return NextResponse.json({ ok: true })
     } catch (e: unknown) {
         return NextResponse.json({ message: errMsg(e) }, { status: 400 })
