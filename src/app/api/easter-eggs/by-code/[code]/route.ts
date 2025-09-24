@@ -1,10 +1,10 @@
-import {NextResponse} from 'next/server'
+import {NextRequest, NextResponse} from 'next/server'
 import {getEggByCodeWithCounts, claimEggByCode} from '@/server/db/services/easter-eggs.service'
 import {errMsg} from "@/lib/error";
 import {Ctx, getParams} from "@/types/api";
 
-export async function GET(_req: Request, ctx: Ctx<{ id: string }>) {
-    const {id: code} = await getParams(ctx)
+export async function GET(_req: NextRequest, ctx: Ctx<{ code: string }>) {
+    const {code} = await getParams(ctx)
     try {
         const res = await getEggByCodeWithCounts(code)
         if (!res) return NextResponse.json({message: 'Nie znaleziono'}, {status: 404})
@@ -25,8 +25,8 @@ export async function GET(_req: Request, ctx: Ctx<{ id: string }>) {
     }
 }
 
-export async function POST(req: Request, ctx: Ctx<{ id: string }>) {
-    const {id: code} = await getParams(ctx)
+export async function POST(req: NextRequest, ctx: Ctx<{ code: string }>) {
+    const {code} = await getParams(ctx)
     try {
         const {participantId} = await req.json()
         if (!participantId) return NextResponse.json({message: 'Missing participantId'}, {status: 400})
