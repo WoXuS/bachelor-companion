@@ -48,7 +48,6 @@ async function fetchByPlacement(key: string): Promise<EggMin | null> {
     if (!r.ok) return null
     const d = await r.json()
     if (!d) return null
-    console.log('test')
     return { id: d.id, code: d.code, active: d.active }
 }
 
