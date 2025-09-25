@@ -1,5 +1,6 @@
 import {prisma} from '@/server/db/prisma'
 import {Prisma, EasterEggType, Transaction} from '@prisma/client'
+import {EggClaimedEvent} from "@/server/realtime/pusher";
 
 const EGG_POINTS = 50
 
@@ -91,7 +92,7 @@ export async function getEggByPlacement(placementKey: string) {
 export async function claimEggByCode(
     code: string,
     participantId: string
-): Promise<Transaction> {
+): Promise<{ tx: Transaction; event: EggClaimedEvent }> {
     return prisma.$transaction(async (tx) => {
         const egg = await tx.easterEgg.findUnique({where: {code}})
         if (!egg) throw new Error('Nie znaleziono jajka')
@@ -100,18 +101,19 @@ export async function claimEggByCode(
         const {total, found} = await countsForType(tx, egg.type)
         const x = found + 1
         const remainingAfter = total - x
+        const claimedAt = new Date()
 
         await tx.easterEgg.update({
             where: {id: egg.id},
             data: {active: false, claimedById: participantId, claimedAt: new Date()},
         })
 
-        const p = await tx.participant.findUnique({
+        const participant = await tx.participant.findUnique({
             where: {id: participantId},
-            select: {balance: true},
+            select: {balance: true, name: true},
         })
-        if (!p) throw new Error('Participant not found')
-        const next = p.balance + EGG_POINTS
+        if (!participant) throw new Error('Participant not found')
+        const next = participant.balance + EGG_POINTS
 
         const typeLabel = egg.type === 'PHYSICAL' ? 'Fizyczny' : 'Wirtualny'
         const reason = `${typeLabel} easter egg ${x}/${total} (pozostało: ${remainingAfter})`
@@ -132,14 +134,23 @@ export async function claimEggByCode(
             data: {balance: next},
         })
 
-        return created
+        const event: EggClaimedEvent = {
+            type: egg.type,
+            number: egg.number,
+            label: egg.label ?? null,
+            participantName: participant.name,
+            claimedAt: claimedAt.toISOString(),
+            counts: {total, remaining: remainingAfter}
+        }
+
+        return {tx: created, event}
     })
 }
 
 export async function claimEggById(
     id: string,
     participantId: string
-): Promise<Transaction> {
+): Promise<{ tx: Transaction; event: EggClaimedEvent }> {
     return prisma.$transaction(async (tx) => {
         const egg = await tx.easterEgg.findUnique({where: {id}})
         if (!egg) throw new Error('Nie znaleziono jajka')
@@ -148,18 +159,18 @@ export async function claimEggById(
         const {total, found} = await countsForType(tx, egg.type)
         const x = found + 1
         const remainingAfter = total - x
-
+        const claimedAt = new Date()
         await tx.easterEgg.update({
             where: {id: egg.id},
             data: {active: false, claimedById: participantId, claimedAt: new Date()},
         })
 
-        const p = await tx.participant.findUnique({
+        const participant = await tx.participant.findUnique({
             where: {id: participantId},
-            select: {balance: true},
+            select: {balance: true, name: true},
         })
-        if (!p) throw new Error('Participant not found')
-        const next = p.balance + EGG_POINTS
+        if (!participant) throw new Error('Participant not found')
+        const next = participant.balance + EGG_POINTS
 
         const typeLabel = egg.type === 'PHYSICAL' ? 'Fizyczny' : 'Wirtualny'
         const reason = `${typeLabel} easter egg ${x}/${total} (pozostało: ${remainingAfter})`
@@ -180,7 +191,16 @@ export async function claimEggById(
             data: {balance: next},
         })
 
-        return created
+        const event: EggClaimedEvent = {
+            type: egg.type,
+            number: egg.number,
+            label: egg.label ?? null,
+            participantName: participant.name,
+            claimedAt: claimedAt.toISOString(),
+            counts: {total, remaining: remainingAfter}
+        }
+
+        return {tx: created, event}
     })
 }
 

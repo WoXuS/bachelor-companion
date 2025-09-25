@@ -2,6 +2,7 @@ import {NextRequest, NextResponse} from 'next/server'
 import {getEggByCodeWithCounts, claimEggByCode} from '@/server/db/services/easter-eggs.service'
 import {errMsg} from "@/lib/error";
 import {Ctx, getParams} from "@/types/api";
+import {publishEggClaimed} from "@/server/realtime/pusher";
 
 export async function GET(_req: NextRequest, ctx: Ctx<{ code: string }>) {
     const {code} = await getParams(ctx)
@@ -30,7 +31,12 @@ export async function POST(req: NextRequest, ctx: Ctx<{ code: string }>) {
     try {
         const {participantId} = await req.json()
         if (!participantId) return NextResponse.json({message: 'Missing participantId'}, {status: 400})
-        const tx = await claimEggByCode(code, participantId)
+        const { tx, event } = await claimEggByCode(code, participantId)
+
+        publishEggClaimed(event).catch((e) => {
+            console.error('Failed to publish egg-claimed event', e)
+        })
+
         return NextResponse.json(tx)
     } catch (e: unknown) {
         return NextResponse.json({message: errMsg(e)}, {status: 400})
