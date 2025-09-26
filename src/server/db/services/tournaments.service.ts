@@ -505,7 +505,8 @@ export async function createSoloTournamentCompact(params: {
         )
 
         return t
-    })
+    },{timeout:60_000}
+                              )
 }
 
 function startedLite(m: { isBye: boolean; winnerParticipantId: string | null }) {
