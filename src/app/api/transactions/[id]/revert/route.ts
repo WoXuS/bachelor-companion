@@ -1,15 +1,9 @@
-import { NextResponse } from 'next/server'
-import { revertTransaction } from '@/server/db/repositories/transaction.repo'
-import {errMsg} from "@/lib/error";
-import {Ctx, getParams} from "@/types/api";
+import {defineRoute} from '@/server/api/route'
+import {idParams} from '@/server/api/schemas'
+import {revertTransaction} from '@/server/db/repositories/transaction.repo'
 
-
-export async function POST(req: Request, ctx: Ctx<{ id: string }>) {
-    const { id } = await getParams(ctx)
-    try {
-        const revertTx = await revertTransaction(id)
-        return NextResponse.json(revertTx)
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
-    }
-}
+export const POST = defineRoute({
+    admin: true,
+    params: idParams,
+    handler: ({params}) => revertTransaction(params.id),
+})

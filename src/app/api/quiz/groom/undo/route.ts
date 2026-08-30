@@ -1,12 +1,4 @@
-import { NextResponse } from 'next/server'
-import { undoLastGroom } from '@/server/db/services/quiz.service'
-import {errMsg} from "@/lib/error";
+import {defineRoute} from '@/server/api/route'
+import {undoLastGroom} from '@/server/db/services/quiz.service'
 
-export async function POST() {
-    try {
-        const r = await undoLastGroom()
-        return NextResponse.json(r)
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
-    }
-}
+export const POST = defineRoute({admin: true, handler: () => undoLastGroom()})

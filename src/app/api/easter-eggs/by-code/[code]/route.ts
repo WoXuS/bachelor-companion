@@ -1,44 +1,25 @@
-import {NextRequest, NextResponse} from 'next/server'
-import {getEggByCodeWithCounts, claimEggByCode} from '@/server/db/services/easter-eggs.service'
-import {errMsg} from "@/lib/error";
-import {Ctx, getParams} from "@/types/api";
-import {publishEggClaimed} from "@/server/realtime/pusher";
+import {notFound} from '@/lib/errors'
+import {defineRoute} from '@/server/api/route'
+import {codeParams, participantIdBody} from '@/server/api/schemas'
+import {claimEgg, getEggWithCounts} from '@/server/db/services/easter-eggs.service'
+import {toPublicEgg} from '@/server/api/serializers'
+import {publishEggClaimed} from '@/server/realtime/pusher'
 
-export async function GET(_req: NextRequest, ctx: Ctx<{ code: string }>) {
-    const {code} = await getParams(ctx)
-    try {
-        const res = await getEggByCodeWithCounts(code)
-        if (!res) return NextResponse.json({message: 'Nie znaleziono'}, {status: 404})
-        const {egg, counts} = res
-        return NextResponse.json({
-            id: egg.id,
-            code: egg.code,
-            number: egg.number,
-            type: egg.type,
-            active: egg.active,
-            label: egg.label,
-            claimedAt: egg.claimedAt,
-            claimedBy: egg.claimedBy ? {id: egg.claimedBy.id, name: egg.claimedBy.name} : null,
-            counts: {total: counts.total, found: counts.found, remaining: counts.remaining},
-        })
-    } catch (e: unknown) {
-        return NextResponse.json({message: errMsg(e)}, {status: 500})
-    }
-}
+export const GET = defineRoute({
+    params: codeParams,
+    handler: async ({params}) => {
+        const found = await getEggWithCounts({code: params.code})
+        if (!found) throw notFound('Nie znaleziono')
+        return toPublicEgg(found.egg, found.counts)
+    },
+})
 
-export async function POST(req: NextRequest, ctx: Ctx<{ code: string }>) {
-    const {code} = await getParams(ctx)
-    try {
-        const {participantId} = await req.json()
-        if (!participantId) return NextResponse.json({message: 'Missing participantId'}, {status: 400})
-        const { tx, event } = await claimEggByCode(code, participantId)
-
-        publishEggClaimed(event).catch((e) => {
-            console.error('Failed to publish egg-claimed event', e)
-        })
-
-        return NextResponse.json(tx)
-    } catch (e: unknown) {
-        return NextResponse.json({message: errMsg(e)}, {status: 400})
-    }
-}
+export const POST = defineRoute({
+    params: codeParams,
+    body: participantIdBody,
+    handler: async ({params, body}) => {
+        const {tx, event} = await claimEgg({code: params.code}, body.participantId)
+        void publishEggClaimed(event)
+        return tx
+    },
+})

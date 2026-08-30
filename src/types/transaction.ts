@@ -1,7 +1,3 @@
-import {Transaction} from '@prisma/client'
-
-export type TransactionDb = Transaction
-
 export type TransactionDto = {
     id: string
     amount: number

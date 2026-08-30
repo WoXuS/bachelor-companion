@@ -1,25 +1,14 @@
-import {NextResponse} from 'next/server'
-import {getEggByIdWithCounts} from '@/server/db/services/easter-eggs.service'
-import {errMsg} from "@/lib/error";
-import {Ctx, getParams} from "@/types/api";
+import {notFound} from '@/lib/errors'
+import {defineRoute} from '@/server/api/route'
+import {idParams} from '@/server/api/schemas'
+import {getEggWithCounts} from '@/server/db/services/easter-eggs.service'
+import {toPublicEgg} from '@/server/api/serializers'
 
-export async function GET(_req: Request, ctx: Ctx<{ id: string }>) {
-    try {
-        const { id } = await getParams(ctx)
-        const res = await getEggByIdWithCounts(id)
-        if (!res) return NextResponse.json({message: 'Nie znaleziono'}, {status: 404})
-        const {egg, counts} = res
-        return NextResponse.json({
-            id: egg.id,
-            number: egg.number,
-            type: egg.type,
-            active: egg.active,
-            label: egg.label,
-            claimedAt: egg.claimedAt,
-            claimedBy: egg.claimedBy ? {id: egg.claimedBy.id, name: egg.claimedBy.name} : null,
-            counts: {total: counts.total, found: counts.found, remaining: counts.remaining},
-        })
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, {status: 500})
-    }
-}
+export const GET = defineRoute({
+    params: idParams,
+    handler: async ({params}) => {
+        const found = await getEggWithCounts({id: params.id})
+        if (!found) throw notFound('Nie znaleziono')
+        return toPublicEgg(found.egg, found.counts)
+    },
+})

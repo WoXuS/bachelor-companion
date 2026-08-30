@@ -1,14 +1,12 @@
-import {NextResponse} from 'next/server'
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {idParams} from '@/server/api/schemas'
 import {addTransaction} from '@/server/db/services/economy.service'
-import {Ctx, getParams} from "@/types/api";
 
-export async function POST(req: Request, ctx: Ctx<{ id: string }>) {
-    const {amount, reason} = await req.json()
-    const {id} = await getParams(ctx)
-    if (typeof amount !== 'number' || !reason) {
-        return NextResponse.json({error: 'Invalid input'}, {status: 400})
-    }
-
-    const tx = await addTransaction(id, amount, reason)
-    return NextResponse.json(tx)
-}
+export const POST = defineRoute({
+    admin: true,
+    params: idParams,
+    body: z.object({amount: z.number().int(), reason: z.string().trim().min(1)}),
+    handler: ({params, body}) =>
+        addTransaction({participantId: params.id, amount: body.amount, reason: body.reason}),
+})

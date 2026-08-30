@@ -1,7 +1,4 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/server/db/prisma'
+import {defineRoute} from '@/server/api/route'
+import {listPrizes} from '@/server/db/repositories/prizes.repo'
 
-export async function GET() {
-    const prizes = await prisma.prize.findMany({ orderBy: { place: 'asc' } })
-    return NextResponse.json(prizes)
-}
+export const GET = defineRoute({handler: () => listPrizes()})

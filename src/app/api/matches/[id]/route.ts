@@ -1,12 +1,10 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/server/db/prisma'
-import {Ctx, getParams} from "@/types/api";
+import {defineRoute} from '@/server/api/route'
+import {bestOfBody, idParams} from '@/server/api/schemas'
+import {setMatchBestOf} from '@/server/db/repositories/matches.repo'
 
-
-export async function PATCH(req: Request, ctx: Ctx<{ id: string }>) {
-    const { id } = await getParams(ctx)
-    const { bestOf } = await req.json()
-    if (![1,3,5].includes(bestOf)) return NextResponse.json({ message: 'Invalid bestOf' }, { status: 400 })
-    const m = await prisma.match.update({ where: { id: id }, data: { bestOf } })
-    return NextResponse.json(m)
-}
+export const PATCH = defineRoute({
+    admin: true,
+    params: idParams,
+    body: bestOfBody,
+    handler: ({params, body}) => setMatchBestOf(params.id, body.bestOf),
+})

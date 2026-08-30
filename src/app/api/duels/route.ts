@@ -1,30 +1,17 @@
-import {NextRequest, NextResponse} from 'next/server'
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
 import {listDuels} from '@/server/db/repositories/duels.repo'
 import {createDuel} from '@/server/db/services/duels.service'
-import {errMsg} from '@/lib/error'
 
-export async function GET() {
-    const rows = await listDuels()
-    return NextResponse.json(rows)
-}
+export const GET = defineRoute({handler: () => listDuels()})
 
-export async function POST(req: NextRequest) {
-    const body = (await req.json()) as {
-        title?: unknown
-        stake?: unknown
-        playerAId?: unknown
-        playerBId?: unknown
-    }
-
-    try {
-        const d = await createDuel({
-            title: typeof body.title === 'string' ? body.title : '',
-            stake: Number(body.stake ?? 0),
-            playerAId: String(body.playerAId ?? ''),
-            playerBId: String(body.playerBId ?? ''),
-        })
-        return NextResponse.json(d)
-    } catch (e: unknown) {
-        return NextResponse.json({message: errMsg(e)}, {status: 400})
-    }
-}
+export const POST = defineRoute({
+    admin: true,
+    body: z.object({
+        title: z.string().trim().min(1),
+        stake: z.coerce.number().int().min(0),
+        playerAId: z.string().min(1),
+        playerBId: z.string().min(1),
+    }),
+    handler: ({body}) => createDuel(body),
+})

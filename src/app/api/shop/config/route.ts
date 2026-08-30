@@ -1,25 +1,14 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/server/db/prisma'
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {getShopConfig, updateShopConfig} from '@/server/db/services/pricing.service'
 
-export async function GET() {
-    const cfg = await prisma.shopConfig.findUnique({ where: { id: 'singleton' } })
-    return NextResponse.json(cfg ?? { discountsEnabled: false, discountPercent: 20 })
-}
+export const GET = defineRoute({handler: () => getShopConfig()})
 
-export async function PUT(req: Request) {
-    const body = await req.json().catch(() => ({}))
-    const { discountsEnabled, discountPercent } = body
-    const cfg = await prisma.shopConfig.upsert({
-        where: { id: 'singleton' },
-        update: {
-            ...(typeof discountsEnabled === 'boolean' ? { discountsEnabled } : {}),
-            ...(typeof discountPercent === 'number' ? { discountPercent } : {}),
-        },
-        create: {
-            id: 'singleton',
-            discountsEnabled: !!discountsEnabled,
-            discountPercent: typeof discountPercent === 'number' ? discountPercent : 20,
-        },
-    })
-    return NextResponse.json(cfg)
-}
+export const PUT = defineRoute({
+    admin: true,
+    body: z.object({
+        discountsEnabled: z.boolean().optional(),
+        discountPercent: z.coerce.number().int().min(0).max(100).optional(),
+    }),
+    handler: ({body}) => updateShopConfig(body),
+})

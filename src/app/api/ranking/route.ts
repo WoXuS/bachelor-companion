@@ -1,7 +1,4 @@
-import { NextResponse } from 'next/server'
-import { getRanking } from '@/server/db/services/ranking.service'
+import {defineRoute} from '@/server/api/route'
+import {getRanking} from '@/server/db/services/ranking.service'
 
-export async function GET() {
-    const ranking = await getRanking()
-    return NextResponse.json(ranking)
-}
+export const GET = defineRoute({handler: () => getRanking()})

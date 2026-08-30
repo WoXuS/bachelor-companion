@@ -1,36 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { reportDuel, revertDuel } from '@/server/db/services/duels.service'
-import { errMsg } from '@/lib/error'
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {idParams, score, winnerSide} from '@/server/api/schemas'
+import {reportDuel, revertDuel} from '@/server/db/services/duels.service'
 
-type Ctx = { params: Promise<{ id: string }> }
-const toNum = (v: unknown) => (v == null ? undefined : Number(v))
+export const POST = defineRoute({
+    admin: true,
+    params: idParams,
+    body: z.object({winner: winnerSide, scoreA: score, scoreB: score}),
+    handler: async ({params, body}) => {
+        await reportDuel({id: params.id, ...body})
+        return {ok: true}
+    },
+})
 
-export async function POST(req: NextRequest, ctx: Ctx) {
-    try {
-        const { id } = await ctx.params
-        const body = await req.json()
-        const winner = body?.winner === 'A' ? 'A' : body?.winner === 'B' ? 'B' : null
-        if (!winner) return NextResponse.json({ message: 'Invalid winner' }, { status: 400 })
-
-        await reportDuel({
-            id,
-            winner,
-            scoreA: toNum(body?.scoreA),
-            scoreB: toNum(body?.scoreB),
-        })
-
-        return NextResponse.json({ ok: true })
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
-    }
-}
-
-export async function DELETE(_req: NextRequest, ctx: Ctx) {
-    try {
-        const { id } = await ctx.params
-        await revertDuel(id)
-        return NextResponse.json({ ok: true })
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
-    }
-}
+export const DELETE = defineRoute({
+    admin: true,
+    params: idParams,
+    handler: async ({params}) => {
+        await revertDuel(params.id)
+        return {ok: true}
+    },
+})

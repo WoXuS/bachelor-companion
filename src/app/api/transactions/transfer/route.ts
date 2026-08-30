@@ -1,17 +1,20 @@
-import { NextResponse } from 'next/server'
-import { transferBetween } from '@/server/db/services/economy.service'
-import {errMsg} from "@/lib/error";
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {transferBetween} from '@/server/db/services/economy.service'
 
-export async function POST(req: Request) {
-    try {
-        const { fromId, toId, amount, reason } = await req.json()
-        const n = Number(amount)
-        if (!fromId || !toId || !reason || !Number.isFinite(n))
-            return NextResponse.json({ message: 'Niepoprawne dane' }, { status: 400 })
-
-        const data = await transferBetween(fromId, toId, n, reason)
-        return NextResponse.json(data)
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
-    }
-}
+export const POST = defineRoute({
+    admin: true,
+    body: z.object({
+        fromId: z.string().min(1),
+        toId: z.string().min(1),
+        amount: z.coerce.number().int().positive(),
+        reason: z.string().trim().min(1),
+    }),
+    handler: ({body}) =>
+        transferBetween({
+            fromId: body.fromId,
+            toId: body.toId,
+            amount: body.amount,
+            reasonTo: body.reason,
+        }),
+})

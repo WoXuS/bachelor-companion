@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/server/db/prisma'
-import {Ctx, getParams} from "@/types/api";
+import {defineRoute} from '@/server/api/route'
+import {idParams} from '@/server/api/schemas'
+import {deleteParticipant} from '@/server/db/repositories/participants.repo'
 
-
-export async function DELETE(_req: Request, ctx: Ctx<{ id: string }>) {
-    const { id } = await getParams(ctx)
-
-    await prisma.participant.delete({ where: { id: id } })
-    return NextResponse.json({ ok: true })
-}
+export const DELETE = defineRoute({
+    admin: true,
+    params: idParams,
+    handler: async ({params}) => {
+        await deleteParticipant(params.id)
+        return {ok: true}
+    },
+})

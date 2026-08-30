@@ -1,7 +1,3 @@
-import {Tournament, Prisma} from '@prisma/client'
-
-export type TournamentDb = Tournament
-
 export enum TournamentType {
     SOLO = 'SOLO',
     TEAM = 'TEAM',

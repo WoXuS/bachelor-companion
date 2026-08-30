@@ -1,17 +1,9 @@
-import {NextResponse} from 'next/server'
-import {purchaseFor} from "@/server/db/services/economy.service";
-import {errMsg} from "@/lib/error";
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {purchaseFor} from '@/server/db/services/economy.service'
 
-export async function POST(req: Request) {
-    try {
-        const {participantId, itemId} = await req.json()
-        if (!participantId || !itemId) {
-            return NextResponse.json({error: 'Missing params'}, {status: 400})
-        }
-
-        const tx = await purchaseFor(participantId, itemId)
-        return NextResponse.json(tx)
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, {status: 400})
-    }
-}
+export const POST = defineRoute({
+    admin: true,
+    body: z.object({participantId: z.string().min(1), itemId: z.string().min(1)}),
+    handler: ({body}) => purchaseFor(body.participantId, body.itemId),
+})

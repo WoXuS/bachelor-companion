@@ -1,22 +1,15 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/server/db/prisma'
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {listAllParticipants, upsertParticipant} from '@/server/db/repositories/participants.repo'
 
-export async function GET() {
-    const rows = await prisma.participant.findMany({ orderBy: { createdAt: 'asc' } })
-    return NextResponse.json(rows)
-}
+export const GET = defineRoute({handler: () => listAllParticipants()})
 
-export async function POST(req: Request) {
-    const data = await req.json()
-    if (data.id) {
-        const updated = await prisma.participant.update({
-            where: { id: data.id },
-            data: { name: data.name, avatarUrl: data.avatarUrl },
-        })
-        return NextResponse.json(updated)
-    }
-    const created = await prisma.participant.create({
-        data: { name: data.name, avatarUrl: data.avatarUrl },
-    })
-    return NextResponse.json(created)
-}
+export const POST = defineRoute({
+    admin: true,
+    body: z.object({
+        id: z.string().min(1).optional(),
+        name: z.string().trim().min(1),
+        avatarUrl: z.string().trim().min(1).nullish(),
+    }),
+    handler: ({body}) => upsertParticipant(body),
+})

@@ -1,16 +1,18 @@
-import { NextResponse } from 'next/server'
-import { reportMatch } from '@/server/db/services/tournaments.service'
-import {errMsg} from "@/lib/error";
-import {Ctx} from "@/types/api";
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {score, winnerSide} from '@/server/api/schemas'
+import {reportMatch} from '@/server/db/services/tournaments.service'
 
-type Params = { params: { id: string } }
-
-export async function POST(req: Request, _ctx: Ctx<{ id: string }>) {
-    const { matchId, winner, scoreA, scoreB } = await req.json()
-    try {
-        await reportMatch({ matchId, winner, scoreA, scoreB })
-        return NextResponse.json({ ok: true })
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, { status: 400 })
-    }
-}
+export const POST = defineRoute({
+    admin: true,
+    body: z.object({
+        matchId: z.string().min(1),
+        winner: winnerSide,
+        scoreA: score,
+        scoreB: score,
+    }),
+    handler: async ({body}) => {
+        await reportMatch(body)
+        return {ok: true}
+    },
+})

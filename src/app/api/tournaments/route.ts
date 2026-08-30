@@ -1,36 +1,33 @@
-import {NextResponse} from 'next/server'
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {nonNegativeInt, teamInput} from '@/server/api/schemas'
 import {listTournaments} from '@/server/db/repositories/tournaments.repo'
-import {createSoloTournamentCompact, createTeamTournament} from '@/server/db/services/tournaments.service'
-import {errMsg} from "@/lib/error";
+import {createSoloTournament, createTeamTournament} from '@/server/db/services/tournaments.service'
 
-export async function GET() {
-    const rows = await listTournaments()
-    return NextResponse.json(rows)
-}
+const createBody = z.discriminatedUnion('type', [
+    z.object({
+        type: z.literal('SOLO'),
+        title: z.string().trim().min(1),
+        mainPrize: nonNegativeInt,
+        matchWinPrize: nonNegativeInt,
+        consolationPrize: nonNegativeInt.default(0),
+        participantIds: z.array(z.string().min(1)).min(2),
+    }),
+    z.object({
+        type: z.literal('TEAM'),
+        title: z.string().trim().min(1),
+        mainPrize: nonNegativeInt,
+        matchWinPrize: nonNegativeInt.default(0),
+        teamA: teamInput,
+        teamB: teamInput,
+    }),
+])
 
-export async function POST(req: Request) {
-    const body = await req.json()
-    try {
-        if (body.type === 'SOLO') {
-            const t = await createSoloTournamentCompact({
-                title: body.title,
-                mainPrize: Number(body.mainPrize),
-                matchWinPrize: Number(body.matchWinPrize),
-                consolationPrize: Number(body.consolationPrize),
-                participantIds: body.participantIds,
-            })
-            return NextResponse.json(t)
-        } else {
-            const t = await createTeamTournament({
-                title: body.title,
-                mainPrize: Number(body.mainPrize),
-                matchWinPrize: Number(body.matchWinPrize),
-                teamA: body.teamA,
-                teamB: body.teamB,
-            })
-            return NextResponse.json(t)
-        }
-    } catch (e: unknown) {
-        return NextResponse.json({ message: errMsg(e) }, {status: 400})
-    }
-}
+export const GET = defineRoute({handler: () => listTournaments()})
+
+export const POST = defineRoute({
+    admin: true,
+    body: createBody,
+    handler: ({body}) =>
+        body.type === 'SOLO' ? createSoloTournament(body) : createTeamTournament(body),
+})

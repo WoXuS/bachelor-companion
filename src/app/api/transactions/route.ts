@@ -1,11 +1,18 @@
-import {NextResponse} from 'next/server'
-import {listTransactions} from "@/server/db/repositories/transaction.repo";
+import {z} from 'zod'
+import {defineRoute} from '@/server/api/route'
+import {listTransactions} from '@/server/db/repositories/transaction.repo'
 
-export async function GET(req: Request) {
-    const {searchParams} = new URL(req.url)
-    const participantId = searchParams.get('participantId') || undefined
-    const order = (searchParams.get('order') as 'asc' | 'desc') || 'desc'
+const query = z.object({
+    participantId: z.string().min(1).optional(),
+    order: z.enum(['asc', 'desc']).default('desc'),
+})
 
-    const data = await listTransactions({participantId, order})
-    return NextResponse.json(data)
-}
+export const GET = defineRoute({
+    handler: ({req}) => {
+        const {participantId, order} = query.parse({
+            participantId: req.nextUrl.searchParams.get('participantId') ?? undefined,
+            order: req.nextUrl.searchParams.get('order') ?? undefined,
+        })
+        return listTransactions({participantId, order})
+    },
+})
