@@ -3,12 +3,13 @@
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { QRCodeSVG } from 'qrcode.react'
+import {apiGet} from '@/lib/api-client'
 
 type Egg = { id: string; code: string; number: number; type: 'PHYSICAL'|'VIRTUAL'; active: boolean; label?: string|null }
 
 const LOGO_URL = '/images/easter-egg.png'
 const LOGO_SIZE = 56
-const CANONICAL_BASE = process.env.NEXT_PUBLIC_CANONICAL_BASE || 'https://kawalerski.wozniakkamil.com'
+const CANONICAL_BASE = process.env.NEXT_PUBLIC_CANONICAL_BASE ?? 'http://localhost:3000'
 
 function useRefMap<T extends Element>() {
     const mapRef = React.useRef(new Map<string, T | null>())
@@ -134,9 +135,4 @@ export default function EggQrPage() {
     )
 }
 
-async function fetchEggs(): Promise<Egg[]> {
-    const r = await fetch('/api/easter-eggs', { cache: 'no-store' })
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Load failed')
-    return d
-}
+const fetchEggs = () => apiGet<Egg[]>('/api/easter-eggs')

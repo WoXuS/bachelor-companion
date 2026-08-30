@@ -11,26 +11,13 @@ import {ParticipantDto} from "@/types/participant";
 import {getAdmin} from "@/hooks/useAdmin";
 import {Receipt} from "lucide-react";
 import {toast} from "sonner";
-import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
+import VirtualEggButton from "@/components/easter-egg/VirtualEggButton";
+import {apiGet, apiPost} from '@/lib/api-client'
 
-async function fetchRanking(): Promise<ParticipantDto[]> {
-    const res = await fetch('/api/ranking')
-    if (!res.ok) throw new Error('Failed to fetch ranking')
-    return res.json()
-}
+const fetchRanking = () => apiGet<ParticipantDto[]>('/api/ranking')
 
-async function addTransaction(id: string, amount: number, reason: string) {
-
-    const res = await fetch(`/api/participants/${id}/transactions`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({amount, reason}),
-
-    })
-    const d = await res.json()
-    if (!res.ok) throw new Error(d?.message || 'Load failed')
-    return d
-}
+const addTransaction = (id: string, amount: number, reason: string) =>
+    apiPost(`/api/participants/${id}/transactions`, {amount, reason})
 
 export default function RankingPage() {
     const queryClient = useQueryClient()
@@ -85,11 +72,7 @@ export default function RankingPage() {
                                 height={60}
                                 className="rounded-full py-2 "
                             />
-                            {p.name === "Antoni" &&
-                                <VirtualEggButton placementKey="ranking-first"
-                                                  className="absolute right-[47%] top-[60%] transform-[translate(-50%,-50%)] z-20 opacity-10"/>
-                            }
-                            {p.name === "Borys" &&
+                            {idx === rest.length - 1 &&
                                 <VirtualEggButton placementKey="ranking-last"
                                                   className="absolute right-[40%] top-[50%] transform-[translate(-50%,-50%)] z-20 opacity-25"/>
                             }
