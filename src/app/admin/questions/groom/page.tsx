@@ -7,7 +7,8 @@ import {toast} from 'sonner'
 import {CustomLoader} from '@/components/ui/CustomLoader'
 import AudioPlayer from '@/components/ui/AudioPlayer'
 import {PartyPopper, ThumbsDown} from "lucide-react";
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {apiGet, apiPost} from '@/lib/api-client'
 
 type NextQ = {
     question: { id: string; number: number; text: string; audioUrl?: string | null } | null
@@ -22,37 +23,13 @@ type Stats = {
     shots: number
 }
 
-async function fetchNext(): Promise<NextQ> {
-    const r = await fetch('/api/quiz/next?kind=GROOM', {cache: 'no-store'})
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Load failed')
-    return d
-}
+const fetchNext = () => apiGet<NextQ>('/api/quiz/next?kind=GROOM')
 
-async function fetchStats(): Promise<Stats> {
-    const r = await fetch('/api/quiz/groom/stats', {cache: 'no-store'})
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Stats failed')
-    return d
-}
+const fetchStats = () => apiGet<Stats>('/api/quiz/groom/stats')
 
-async function mark(id: string, correct: boolean) {
-    const r = await fetch(`/api/quiz/groom/${id}/mark`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({correct}),
-    })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d?.message || 'Mark failed')
-    return d
-}
+const mark = (id: string, correct: boolean) => apiPost(`/api/quiz/groom/${id}/mark`, {correct})
 
-async function undoGroom() {
-    const r = await fetch('/api/quiz/groom/undo', {method: 'POST'})
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d?.message || 'Undo failed')
-    return d as { undoneQuestionNumber: number }
-}
+const undoGroom = () => apiPost<{ undoneQuestionNumber: number }>('/api/quiz/groom/undo')
 
 export default function GroomQuizPage() {
     const qc = useQueryClient()

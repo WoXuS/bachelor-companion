@@ -8,23 +8,14 @@ import {Label} from '@/components/ui/label'
 import {MultiSelect} from '@/components/ui/multi-select'
 import {toast} from 'sonner'
 import {TTournament, TournamentType} from '@/types/tournament'
-import {ParticipantDto} from '@/types/participant'
 import {Cog, Trash2} from "lucide-react";
 import { UpdateTournamentBasicsPayload, UpdateTournamentParticipantsPayload} from "@/types/api";
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {fetchParticipants} from '@/hooks/queries'
+import {apiGet} from '@/lib/api-client'
 
-async function fetchTournament(id: string): Promise<TTournament> {
-    const r = await fetch(`/api/tournaments/${id}`)
-    const j = await r.json()
-    if (!r.ok) throw new Error(j?.message || 'Load failed')
-    return j
-}
+const fetchTournament = (id: string) => apiGet<TTournament>(`/api/tournaments/${id}`)
 
-async function fetchParticipants(): Promise<ParticipantDto[]> {
-    const r = await fetch('/api/participants')
-    if (!r.ok) throw new Error('Failed to load participants')
-    return r.json()
-}
 
 export function EditTournamentDialog({tournamentId}: { tournamentId: string }) {
     const [open, setOpen] = React.useState(false)

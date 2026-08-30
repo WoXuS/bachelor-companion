@@ -7,15 +7,10 @@ import {Input} from "@/components/ui/input";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {toast} from "sonner";
 import {TournamentType} from '@/types/tournament';
-import {ParticipantDto} from "@/types/participant";
 import {MultiSelect} from "@/components/ui/multi-select";
 import {CreateTournamentPayload} from "@/types/api";
+import {fetchParticipants} from '@/hooks/queries'
 
-async function fetchParticipants(): Promise<ParticipantDto[]> {
-    const res = await fetch('/api/participants')
-    if (!res.ok) throw new Error('Failed to load participants')
-    return res.json()
-}
 
 export function NewTournamentDialog({onCreate}: { onCreate: (payload: CreateTournamentPayload) => void }) {
     const [open, setOpen] = useState(false)

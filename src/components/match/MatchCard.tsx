@@ -8,7 +8,7 @@ import {toast} from 'sonner'
 import {TMatch, TTournament} from "@/types/tournament"
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
 import {RefreshCw} from "lucide-react"
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
 
 const winsNeeded = (bestOf?: number) => Math.ceil((bestOf ?? 1) / 2)
 

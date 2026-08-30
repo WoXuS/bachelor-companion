@@ -8,21 +8,12 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {toast} from 'sonner'
 import Link from 'next/link'
 import {EasterEggDto} from "@/types/easter-egg";
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {apiGet, apiPost} from '@/lib/api-client'
 
-async function fetchEggs(): Promise<EasterEggDto[]> {
-    const r = await fetch('/api/easter-eggs', {cache: 'no-store'})
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Load failed')
-    return d
-}
+const fetchEggs = () => apiGet<EasterEggDto[]>('/api/easter-eggs')
 
-async function reactivateEgg(id: string) {
-    const r = await fetch(`/api/easter-eggs/${id}/reactivate`, {method: 'POST'})
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Reactivate failed')
-    return d
-}
+const reactivateEgg = (id: string) => apiPost(`/api/easter-eggs/${id}/reactivate`)
 
 export default function EasterEggsAdmin() {
     const qc = useQueryClient()

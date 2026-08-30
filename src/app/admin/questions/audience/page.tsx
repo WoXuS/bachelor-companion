@@ -6,10 +6,11 @@ import {Button} from '@/components/ui/button'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {toast} from 'sonner'
 import {CustomLoader} from '@/components/ui/CustomLoader'
-import {ParticipantDto} from '@/types/participant'
 import AudioPlayer from '@/components/ui/AudioPlayer'
 import {CheckCheck} from "lucide-react";
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {fetchParticipants} from '@/hooks/queries'
+import {apiGet, apiPost} from '@/lib/api-client'
 
 type NextQ = {
     question: { id: string; number: number; text: string; audioUrl?: string | null } | null
@@ -22,57 +23,26 @@ type Standings = {
     winners: string[]
 }
 
-async function fetchNext(): Promise<NextQ> {
-    const r = await fetch('/api/quiz/next?kind=AUDIENCE', {cache: 'no-store'})
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Load failed')
-    return d
+const fetchNext = () => apiGet<NextQ>('/api/quiz/next?kind=AUDIENCE')
+
+
+async function fetchConfig(): Promise<{ audienceExcludeIds: string[] }> {
+    const cfg = await apiGet<{ audienceExcludeIds?: unknown }>('/api/shop/config')
+    return {audienceExcludeIds: Array.isArray(cfg.audienceExcludeIds) ? cfg.audienceExcludeIds : []}
 }
 
-async function fetchParticipants(): Promise<ParticipantDto[]> {
-    const r = await fetch('/api/participants', {cache: 'no-store'})
-    if (!r.ok) throw new Error('Load participants failed')
-    return r.json()
-}
+const award = (id: string, participantId: string) =>
+    apiPost(`/api/quiz/audience/${id}/award`, {participantId})
 
-async function fetchConfig(): Promise<{ audienceExcludeIds?: string[] }> {
-    const r = await fetch('/api/shop/config', {cache: 'no-store'})
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Load config failed')
-    return {audienceExcludeIds: Array.isArray(d.audienceExcludeIds) ? d.audienceExcludeIds : []}
-}
+const finalize = () =>
+    apiPost<{ winners: { participantId: string; name: string; correct: number }[]; maxCorrect: number }>(
+        '/api/quiz/audience/finalize',
+    )
 
-async function award(id: string, participantId: string) {
-    const r = await fetch(`/api/quiz/audience/${id}/award`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({participantId}),
-    })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d?.message || 'Award failed')
-    return d
-}
+const undoAudience = () =>
+    apiPost<{ undoneQuestionNumber: number; participantId: string }>('/api/quiz/audience/undo')
 
-async function finalize() {
-    const r = await fetch(`/api/quiz/audience/finalize`, {method: 'POST'})
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d?.message || 'Finalize failed')
-    return d as { winners: { participantId: string; name: string; correct: number }[]; maxCorrect: number }
-}
-
-async function undoAudience() {
-    const r = await fetch('/api/quiz/audience/undo', {method: 'POST'})
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d?.message || 'Undo failed')
-    return d as { undoneQuestionNumber: number; participantId: string }
-}
-
-async function fetchStandings(): Promise<Standings> {
-    const r = await fetch('/api/quiz/audience/standings', {cache: 'no-store'})
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Standings failed')
-    return d
-}
+const fetchStandings = () => apiGet<Standings>('/api/quiz/audience/standings')
 
 export default function AudienceQuizPage() {
     const qc = useQueryClient()

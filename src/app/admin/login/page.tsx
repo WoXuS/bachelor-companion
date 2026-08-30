@@ -1,7 +1,7 @@
 import {redirect} from 'next/navigation'
 import LoginForm from '@/components/auth/LoginForm'
 import {isAdminServer} from '@/lib/session'
-import VirtualEggButton from '@/components/easter-egg/VitualEggButton'
+import VirtualEggButton from '@/components/easter-egg/VirtualEggButton'
 
 export const dynamic = 'force-dynamic'
 

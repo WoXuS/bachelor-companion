@@ -7,42 +7,21 @@ import {Button} from '@/components/ui/button'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {toast} from 'sonner'
 import {CustomLoader} from '@/components/ui/CustomLoader'
-import {ParticipantDto} from '@/types/participant'
 import {getAdmin} from '@/hooks/useAdmin'
 import {EasterEggDto} from "@/types/easter-egg";
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {fetchParticipants} from '@/hooks/queries'
+import {apiGet, apiPost} from '@/lib/api-client'
 
 
-async function fetchEggByCode(code: string): Promise<EasterEggDto> {
-    const r = await fetch(`/api/easter-eggs/by-code/${encodeURIComponent(code)}`, {cache: 'no-store'})
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Load failed')
-    return d
-}
+const fetchEggByCode = (code: string) =>
+    apiGet<EasterEggDto>(`/api/easter-eggs/by-code/${encodeURIComponent(code)}`)
 
-async function fetchParticipants(): Promise<ParticipantDto[]> {
-    const r = await fetch('/api/participants', {cache: 'no-store'})
-    if (!r.ok) throw new Error('Load participants failed')
-    return r.json()
-}
 
-async function claimByCode(code: string, participantId: string) {
-    const r = await fetch(`/api/easter-eggs/by-code/${encodeURIComponent(code)}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({participantId}),
-    })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d?.message || 'Claim failed')
-    return d
-}
+const claimByCode = (code: string, participantId: string) =>
+    apiPost(`/api/easter-eggs/by-code/${encodeURIComponent(code)}`, {participantId})
 
-async function reactivateEgg(id: string) {
-    const r = await fetch(`/api/easter-eggs/${id}/reactivate`, {method: 'POST'})
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d?.message || 'Reactivate failed')
-    return d
-}
+const reactivateEgg = (id: string) => apiPost(`/api/easter-eggs/${id}/reactivate`)
 
 export default function EasterEggByCodePage() {
     const {code} = useParams() as { code: string }

@@ -5,7 +5,6 @@ import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
 
 export default function AudioPlayer({ src }: { src: string }) {
     const audioRef = React.useRef<HTMLAudioElement | null>(null)
-    const [ready, setReady] = React.useState(false)
     const [playing, setPlaying] = React.useState(false)
     const [duration, setDuration] = React.useState(0)
     const [current, setCurrent] = React.useState(0)
@@ -15,10 +14,7 @@ export default function AudioPlayer({ src }: { src: string }) {
     React.useEffect(() => {
         const el = audioRef.current
         if (!el) return
-        const onLoaded = () => {
-            setDuration(el.duration || 0)
-            setReady(true)
-        }
+        const onLoaded = () => setDuration(el.duration || 0)
         const onTime = () => setCurrent(el.currentTime || 0)
         const onEnd = () => setPlaying(false)
 

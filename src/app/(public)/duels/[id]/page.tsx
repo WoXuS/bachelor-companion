@@ -8,33 +8,16 @@ import {VersusCard} from '@/components/match/VersusCard'
 import {DuelDto} from '@/types/duel'
 import {getAdmin} from '@/hooks/useAdmin'
 import {useParams} from 'next/navigation'
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {apiGet, apiPatch, apiPost} from '@/lib/api-client'
 
-async function fetchDuel(id: string): Promise<DuelDto> {
-    const r = await fetch(`/api/duels/${id}`)
-    const j = await r.json()
-    if (!r.ok) throw new Error(j?.message || 'Load failed')
-    return j
-}
+const fetchDuel = (id: string) => apiGet<DuelDto>(`/api/duels/${id}`)
 
-async function reportDuel(id: string, payload: { winner: 'A' | 'B'; scoreA?: number; scoreB?: number }) {
-    const r = await fetch(`/api/duels/${id}/report`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-    })
-    const j = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(j?.message || 'Report failed')
-    return j
-}
+const reportDuel = (id: string, payload: { winner: 'A' | 'B'; scoreA?: number; scoreB?: number }) =>
+    apiPost(`/api/duels/${id}/report`, payload)
 
 
-async function resetDuel(id: string) {
-    const r = await fetch(`/api/duels/${id}/revert`, {method: 'POST'})
-    const j = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(j?.message || 'Reset failed')
-    return j
-}
+const resetDuel = (id: string) => apiPost(`/api/duels/${id}/revert`)
 
 export default function DuelDetailPage() {
     const {id} = useParams() as { id: string }
@@ -66,16 +49,7 @@ export default function DuelDetailPage() {
         onError: (e) => toast.error(errMsg(e)),
     })
 
-    const patchBestOf = async (bestOf: 1 | 3 | 5) => {
-        const res = await fetch(`/api/duels/${id}`, {
-            method: 'PATCH',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({bestOf})
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data?.message || 'BO update failed')
-        return data
-    }
+    const patchBestOf = (bestOf: 1 | 3 | 5) => apiPatch(`/api/duels/${id}`, {bestOf})
 
     const updateBoMut = useMutation({
         mutationFn: (bo: 1 | 3 | 5) => patchBestOf(bo),

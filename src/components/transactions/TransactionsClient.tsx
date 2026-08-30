@@ -21,39 +21,20 @@ import {CustomLoader} from "@/components/ui/CustomLoader";
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {RefreshCw, Trash2} from "lucide-react"
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {fetchParticipants} from '@/hooks/queries'
+import {apiDelete, apiGet, apiPost} from '@/lib/api-client'
 
-async function fetchTransactions(participantId?: string, order: 'asc' | 'desc' = 'desc'): Promise<TransactionDto[]> {
-    const q = new URLSearchParams()
-    if (participantId) q.append('participantId', participantId)
-    if (order) q.append('order', order)
-    const res = await fetch(`/api/transactions?${q.toString()}`)
-    if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data?.message || 'Failed to fetch transactions')
-    }
-    return res.json()
+function fetchTransactions(participantId?: string, order: 'asc' | 'desc' = 'desc') {
+    const query = new URLSearchParams({order})
+    if (participantId) query.set('participantId', participantId)
+    return apiGet<TransactionDto[]>(`/api/transactions?${query}`)
 }
 
-async function revertTransaction(id: string) {
-    const res = await fetch(`/api/transactions/${id}/revert`, {method: 'POST'})
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data?.message || 'Failed to revert')
-    return data
-}
+const revertTransaction = (id: string) => apiPost(`/api/transactions/${id}/revert`)
 
-async function deleteTransaction(transactionId: string) {
-    const r = await fetch(`/api/transactions/${transactionId}`, {method: 'DELETE'})
-    const j = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(j?.message || 'Delete failed')
-    return j
-}
+const deleteTransaction = (transactionId: string) => apiDelete(`/api/transactions/${transactionId}`)
 
-async function fetchParticipants(): Promise<ParticipantDto[]> {
-    const res = await fetch('/api/participants')
-    if (!res.ok) throw new Error('Failed to load participants')
-    return res.json()
-}
 
 export default function TransactionsClient({
                                                participantId,
@@ -205,9 +186,11 @@ export default function TransactionsClient({
                                         variant={`${wouldBeNegative ? 'outline' : 'secondary'}`}
                                         size="sm"
                                         className={`h-full rounded-none ${wouldBeNegative && 'opacity-40'}`}
-                                        onClick={() => {
-                                            wouldBeNegative ? toast.error('Cofnięcie obniżyłoby saldo poniżej zera') : revertMut.mutate(t.id)
-                                        }}
+                                        onClick={() =>
+                                            wouldBeNegative
+                                                ? toast.error('Cofnięcie obniżyłoby saldo poniżej zera')
+                                                : revertMut.mutate(t.id)
+                                        }
                                         title={wouldBeNegative ? 'Cofnięcie obniżyłoby saldo poniżej zera' : 'Cofnij transakcję'}
                                     >
                                         <RefreshCw className={`${revertMut.isPending ? 'animate-spin' : ''}`}/>
@@ -216,9 +199,11 @@ export default function TransactionsClient({
                                         variant={`${wouldBeNegative ? 'outline' : 'destructive'}`}
                                         size="sm"
                                         className={`h-full ${!isRevert ? 'rounded-none rounded-e-lg' : ''} ${wouldBeNegative && 'opacity-40'}`}
-                                        onClick={() => {
-                                            wouldBeNegative ? toast.error('usunięcie obniżyłoby saldo poniżej zera') : deleteMut.mutate(t.id)
-                                        }}
+                                        onClick={() =>
+                                            wouldBeNegative
+                                                ? toast.error('Usunięcie obniżyłoby saldo poniżej zera')
+                                                : deleteMut.mutate(t.id)
+                                        }
                                         title={wouldBeNegative ? 'Usunięcie obniżyłoby saldo poniżej zera' : 'Usuń transakcję'}
                                     >
                                         <Trash2 className={`${deleteMut.isPending ? 'animate-bounce' : ''}`}/>
@@ -233,18 +218,8 @@ export default function TransactionsClient({
     )
 }
 
-async function transferFetch(data: {
-    fromId: string; toId: string; amount: number; reason: string
-}) {
-    const res = await fetch('/api/transactions/transfer', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data),
-    })
-    const out = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(out?.message || 'Transfer failed')
-    return out
-}
+const transferFetch = (data: {fromId: string; toId: string; amount: number; reason: string}) =>
+    apiPost('/api/transactions/transfer', data)
 
 function NewTransferDialog({participants}: { participants: ParticipantDto[] }) {
     const [open, setOpen] = useState(false)

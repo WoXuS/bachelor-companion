@@ -9,24 +9,15 @@ import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {toast} from 'sonner'
 import {Cog, Trash2} from 'lucide-react'
-import {ParticipantDto} from '@/types/participant'
 import {DuelDto} from '@/types/duel'
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {fetchParticipants} from '@/hooks/queries'
+import {apiGet} from '@/lib/api-client'
 
 export type CreateDuelInput = Pick<DuelDto, 'title' | 'stake' | 'playerAId' | 'playerBId' | 'bestOf'>
 
-async function fetchDuel(id: string): Promise<DuelDto> {
-    const r = await fetch(`/api/duels/${id}`)
-    const j = await r.json()
-    if (!r.ok) throw new Error(j?.message || 'Load failed')
-    return j
-}
+const fetchDuel = (id: string) => apiGet<DuelDto>(`/api/duels/${id}`)
 
-async function fetchParticipants(): Promise<ParticipantDto[]> {
-    const r = await fetch('/api/participants')
-    if (!r.ok) throw new Error('Failed to load participants')
-    return r.json()
-}
 
 type BestOf = 1 | 3 | 5
 

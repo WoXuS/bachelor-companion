@@ -2,54 +2,28 @@
 
 import * as React from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {Button} from '@/components/ui/button'
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {toast} from 'sonner'
 import {EasterEggDto} from "@/types/easter-egg";
-import {errMsg} from "@/lib/error";
-
-type Participant = { id: string; name: string }
+import {errMsg} from "@/lib/errors";
+import {fetchParticipants} from '@/hooks/queries'
+import {apiGet, apiPost} from '@/lib/api-client'
 
 const mountedIds = new Set<string>()
 
-async function fetchEgg(id: string): Promise<EasterEggDto | null> {
-    const r = await fetch(`/api/easter-eggs/${id}`, { cache: 'no-store' })
-    if (r.status === 404) return null
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Load failed')
-    return d
-}
+const fetchEgg = (id: string) => apiGet<EasterEggDto>(`/api/easter-eggs/${id}`)
 
-async function fetchParticipants(): Promise<Participant[]> {
-    const r = await fetch('/api/participants', { cache: 'no-store' })
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.message || 'Load participants failed')
-    return d
-}
 
-async function claimEgg(id: string, participantId: string) {
-    const r = await fetch(`/api/easter-eggs/${id}/claim`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantId }),
-    })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(d?.message || 'Claim failed')
-    return d
-}
+const claimEgg = (id: string, participantId: string) =>
+    apiPost(`/api/easter-eggs/${id}/claim`, {participantId})
 
-type EggMin = { id: string; code: string; active: boolean }
+type EggMin = { id: string; active: boolean }
 
-async function fetchByPlacement(key: string): Promise<EggMin | null> {
-    const r = await fetch(`/api/easter-eggs/placement/${encodeURIComponent(key)}`, { cache: 'no-store' })
-    if (!r.ok) return null
-    const d = await r.json()
-    if (!d) return null
-    return { id: d.id, code: d.code, active: d.active }
-}
+const fetchByPlacement = (key: string) =>
+    apiGet<EggMin | null>(`/api/easter-eggs/placement/${encodeURIComponent(key)}`)
 
 export default function VirtualEggButton({
                                              placementKey,
@@ -166,13 +140,7 @@ function ActiveVirtualEggButtonInner({
                 ) : !egg ? (
                     <p className="text-destructive">Nie znaleziono jajka.</p>
                 ) : !egg.active ? (
-                    <div className="space-y-2">
-                        <p className="text-destructive">To jajko jest już nieaktywne.</p>
-                        <p className="text-xs text-muted-foreground">
-                            Możesz też przejść do strony:{' '}
-                            <Link className="underline" href={`/easter-egg/${egg.code}`}>/easter-egg/{egg.code}</Link>
-                        </p>
-                    </div>
+                    <p className="text-destructive">To jajko jest już nieaktywne.</p>
                 ) : (
                     <div className="space-y-3">
                         <p className="text-sm">

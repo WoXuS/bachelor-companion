@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link";
-import {NotepadText, Award, ArrowRightLeft, BanknoteArrowUp, ChevronDown} from "lucide-react";
+import {NotepadText, ArrowRightLeft, BanknoteArrowUp, ChevronDown} from "lucide-react";
 import {Ranking} from "@/components/icons/Ranking"
 import {Tournament} from "@/components/icons/Tournament";
 import React, {ReactNode, useState} from "react";

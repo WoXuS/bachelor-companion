@@ -7,7 +7,7 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from "@
 import {Button} from "@/components/ui/button";
 import {TParticipant, TTournament} from "@/types/tournament";
 import {winnersOnly} from "@/app/(public)/tournaments/[id]/utils/bracketMeta";
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
 import type {
     DraggableProvided,
     DraggableStateSnapshot

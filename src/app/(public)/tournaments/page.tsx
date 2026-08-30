@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {useState} from 'react'
 import {toast} from 'sonner'
 import {getAdmin} from '@/hooks/useAdmin'
-import {ApiError, CreateTournamentPayload, TournamentListItemDto} from '@/types/api'
+import {CreateTournamentPayload, TournamentListItemDto} from '@/types/api'
 import {CustomLoader} from '@/components/ui/CustomLoader'
 import {DuelDto} from '@/types/duel'
 import {computeTournamentStatus} from './[id]/utils/summary'
@@ -15,42 +15,19 @@ import {NewDuelDialog, NewTournamentDialog} from "./components/CreateNewDialogs"
 import {ChevronRight, Crown, Trash2} from "lucide-react";
 import {EditDuelDialog} from "@/app/(public)/tournaments/components/EditDuelDialog";
 import * as React from "react";
-import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
-import {errMsg} from "@/lib/error";
+import VirtualEggButton from "@/components/easter-egg/VirtualEggButton";
+import {errMsg} from "@/lib/errors";
+import {apiDelete, apiGet, apiPost} from '@/lib/api-client'
 
-async function fetchTournaments(): Promise<TournamentListItemDto[]> {
-    const res = await fetch('/api/tournaments')
-    if (!res.ok) throw new Error('Load failed')
-    return res.json()
-}
+const fetchTournaments = () => apiGet<TournamentListItemDto[]>('/api/tournaments')
 
-async function fetchDuels(): Promise<DuelDto[]> {
-    const res = await fetch('/api/duels')
-    if (!res.ok) throw new Error('Load failed')
-    return res.json()
-}
+const fetchDuels = () => apiGet<DuelDto[]>('/api/duels')
 
-async function createTournament(payload: CreateTournamentPayload): Promise<TournamentListItemDto> {
-    const res = await fetch('/api/tournaments', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error((data as ApiError)?.message || 'Create failed')
-    return data
-}
+const createTournament = (payload: CreateTournamentPayload) =>
+    apiPost<TournamentListItemDto>('/api/tournaments', payload)
 
-async function createDuel(payload: { title: string; stake: number; playerAId: string; playerBId: string }) {
-    const res = await fetch('/api/duels', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error((data as ApiError)?.message || 'Create failed')
-    return data as DuelDto
-}
+const createDuel = (payload: { title: string; stake: number; playerAId: string; playerBId: string }) =>
+    apiPost<DuelDto>('/api/duels', payload)
 
 export default function TournamentsPage() {
     const qc = useQueryClient()
@@ -84,12 +61,7 @@ export default function TournamentsPage() {
     })
 
     const deleteTournamentMut = useMutation({
-        mutationFn: async (tournamentId: string) => {
-            const r = await fetch(`/api/tournaments/${tournamentId}`, {method: 'DELETE'})
-            const j = await r.json().catch(() => ({}))
-            if (!r.ok) throw new Error(j?.message || 'Delete failed')
-            return j
-        },
+        mutationFn: (tournamentId: string) => apiDelete(`/api/tournaments/${tournamentId}`),
         onSuccess: () => {
             toast.success('Usunięto turniej i cofnięto jego transakcje')
             qc.invalidateQueries()

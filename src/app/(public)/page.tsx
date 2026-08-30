@@ -13,9 +13,11 @@ import {ShopItemDto} from "@/types/shop-item"
 import {toast} from "sonner"
 import {CustomLoader} from "@/components/ui/CustomLoader"
 import {Cog, UserRoundPlus} from "lucide-react"
-import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
+import VirtualEggButton from "@/components/easter-egg/VirtualEggButton";
 import {Switch} from "@/components/ui/switch";
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {fetchParticipants} from '@/hooks/queries'
+import {apiDelete, apiGet, apiPost, apiPut} from '@/lib/api-client'
 
 type ShopItemView = ShopItemDto & {
     effectiveCost?: number
@@ -39,84 +41,20 @@ function prettyDeltaPercent(base: number, effective: number) {
     return (pct > 0 ? `+${pct}%` : `${pct}%`)
 }
 
-async function fetchShop(): Promise<ShopItemView[]> {
-    const res = await fetch('/api/shop', {cache: 'no-store'})
-    if (!res.ok) throw new Error('Failed to load shop')
-    return res.json()
-}
+const fetchShop = () => apiGet<ShopItemView[]>('/api/shop')
 
-async function fetchParticipants(): Promise<ParticipantDto[]> {
-    const res = await fetch('/api/participants', {cache: 'no-store'})
-    if (!res.ok) throw new Error('Failed to load participants')
-    return res.json()
-}
 
-async function purchase(participantId: string, itemId: string) {
-    const res = await fetch('/api/shop/purchase', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({participantId, itemId}),
-    })
-    if (!res.ok) {
-        let message = 'Purchase failed'
-        try {
-            const data = await res.json()
-            if (data?.message) message = data.message
-        } catch {
-        }
-        throw new Error(message)
-    }
-    return res.json()
-}
+const purchase = (participantId: string, itemId: string) =>
+    apiPost('/api/shop/purchase', {participantId, itemId})
 
-async function upsertShopItem(data: Partial<ShopItemDto>) {
-    const method = data.id ? 'PUT' : 'POST'
-    const res = await fetch('/api/shop/manage', {
-        method,
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data),
-    })
-    if (!res.ok) {
-        let message = data.id ? 'Failed to update Shop Item' : 'Failed to create Shop Item'
-        try {
-            const j = await res.json()
-            if (j?.message) message = j.message
-        } catch {
-        }
-        throw new Error(message)
-    }
-    return res.json()
-}
+const upsertShopItem = (data: Partial<ShopItemDto>) =>
+    data.id ? apiPut('/api/shop/manage', data) : apiPost('/api/shop/manage', data)
 
-async function removeShopItem(id: string) {
-    const res = await fetch(`/api/shop/manage/${id}`, {method: 'DELETE'})
-    if (!res.ok) {
-        let message = 'Failed to delete Shop Item'
-        try {
-            const j = await res.json()
-            if (j?.message) message = j.message
-        } catch {
-        }
-        throw new Error(message)
-    }
-    return res.json()
-}
+const removeShopItem = (id: string) => apiDelete(`/api/shop/manage/${id}`)
 
-async function fetchShopConfig(): Promise<ShopConfig> {
-    const r = await fetch('/api/shop/config', {cache: 'no-store'})
-    if (!r.ok) throw new Error('Failed to load config')
-    return r.json()
-}
+const fetchShopConfig = () => apiGet<ShopConfig>('/api/shop/config')
 
-async function updateShopConfig(patch: Partial<ShopConfig>) {
-    const r = await fetch('/api/shop/config', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(patch),
-    })
-    if (!r.ok) throw new Error('Failed to update config')
-    return r.json()
-}
+const updateShopConfig = (patch: Partial<ShopConfig>) => apiPut('/api/shop/config', patch)
 
 export default function HomePage() {
     const {data: me} = useQuery({queryKey: ['me'], queryFn: getAdmin, staleTime: 30_000})

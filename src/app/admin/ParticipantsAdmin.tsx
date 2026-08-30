@@ -12,6 +12,8 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog'
 import {CustomLoader} from "@/components/ui/CustomLoader";
+import {fetchParticipants} from '@/hooks/queries'
+import {apiDelete, apiPost} from '@/lib/api-client'
 
 type Participant = {
     id: string
@@ -20,27 +22,10 @@ type Participant = {
     balance: number
 }
 
-async function fetchParticipants(): Promise<Participant[]> {
-    const res = await fetch('/api/participants')
-    if (!res.ok) throw new Error('Failed to fetch participants')
-    return res.json()
-}
 
-async function upsertParticipant(data: Partial<Participant>) {
-    const res = await fetch('/api/participants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-    })
-    if (!res.ok) throw new Error('Failed to save participant')
-    return res.json()
-}
+const upsertParticipant = (data: Partial<Participant>) => apiPost('/api/participants', data)
 
-async function removeParticipant(id: string) {
-    const res = await fetch(`/api/participants/${id}`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('Failed to delete participant')
-    return res.json()
-}
+const removeParticipant = (id: string) => apiDelete(`/api/participants/${id}`)
 
 export default function ParticipantsAdmin() {
     const qc = useQueryClient()

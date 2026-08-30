@@ -1,4 +1,4 @@
-import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
+import VirtualEggButton from "@/components/easter-egg/VirtualEggButton";
 import React from "react";
 
 export default function HowToEarnPage() {

@@ -10,6 +10,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog'
+import {apiPost} from '@/lib/api-client'
 
 export default function LogoutButton() {
     const [open, setOpen] = useState(false)
@@ -19,8 +20,7 @@ export default function LogoutButton() {
     const logout = async () => {
         try {
             setLoading(true)
-            const res = await fetch('/api/auth/logout', { method: 'POST' })
-            if (!res.ok) throw new Error('Failed to log out')
+            await apiPost('/api/auth/logout')
             setOpen(false)
             router.refresh()
         } finally {

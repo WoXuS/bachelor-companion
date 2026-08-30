@@ -2,7 +2,8 @@ import {TMatch, TTournament} from "@/types/tournament"
 import {useMutation, useQueryClient} from "@tanstack/react-query"
 import {toast} from "sonner"
 import {type PrizeBadge, VersusCard} from "@/components/match/VersusCard"
-import {errMsg} from "@/lib/error";
+import {errMsg} from "@/lib/errors";
+import {apiPatch, apiPost} from '@/lib/api-client'
 
 function prizeForMatchUI(m: TMatch, t: TTournament, hasWinnersR0: boolean): PrizeBadge {
     const inWinners = (m.bracket ?? 'WINNERS') === 'WINNERS'
@@ -18,23 +19,10 @@ function prizeForMatchUI(m: TMatch, t: TTournament, hasWinnersR0: boolean): Priz
     }
 }
 
-async function patchBestOf(matchId: string, bestOf: 1 | 3 | 5) {
-    const res = await fetch(`/api/matches/${matchId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bestOf }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data?.message || 'BO update failed')
-    return data
-}
+const patchBestOf = (matchId: string, bestOf: 1 | 3 | 5) =>
+    apiPatch(`/api/matches/${matchId}`, {bestOf})
 
-async function resetMatch(matchId: string) {
-    const res = await fetch(`/api/matches/${matchId}/revert`, { method: 'POST' })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data?.message || 'Reset failed')
-    return data
-}
+const resetMatch = (matchId: string) => apiPost(`/api/matches/${matchId}/revert`)
 
 export default function TeamVersusCardRow({
                                               match,

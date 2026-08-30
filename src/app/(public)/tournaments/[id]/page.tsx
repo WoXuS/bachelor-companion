@@ -20,15 +20,11 @@ import {reseedRound1} from '@/server/db/services/tournaments.service'
 import {getAdmin} from '@/hooks/useAdmin'
 import {CustomLoader} from '@/components/ui/CustomLoader'
 import TeamVersusCardRow from "@/app/(public)/tournaments/[id]/components/TeamVersusCardRow";
-import VirtualEggButton from "@/components/easter-egg/VitualEggButton";
-import {errMsg} from "@/lib/error";
+import VirtualEggButton from "@/components/easter-egg/VirtualEggButton";
+import {errMsg} from "@/lib/errors";
+import {apiGet, apiPost} from '@/lib/api-client'
 
-async function fetchTournament(id: string): Promise<TTournament> {
-    const res = await fetch(`/api/tournaments/${id}`)
-    const data = await res.json()
-    if (!res.ok) throw new Error(data?.message || 'Load failed')
-    return data
-}
+const fetchTournament = (id: string) => apiGet<TTournament>(`/api/tournaments/${id}`)
 
 async function reportMatchAPI(
     tournamentId: string,
@@ -44,12 +40,8 @@ async function reportMatchAPI(
     return data
 }
 
-async function createConsolation(tournamentId: string) {
-    const res = await fetch(`/api/tournaments/${tournamentId}/consolation`, {method: 'POST'})
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data?.message || 'Consolation failed')
-    return data
-}
+const createConsolation = (tournamentId: string) =>
+    apiPost(`/api/tournaments/${tournamentId}/consolation`)
 
 function buildFurthestActiveMatchIdByParticipant(matches: TMatch[]) {
     const map: Record<string, { round: number; matchId: string }> = {}
