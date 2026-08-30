@@ -1,6 +1,6 @@
-import {NextRequest, NextResponse} from 'next/server'
-import {isAdminFromRequest} from '@/lib/session'
+import {defineRoute} from '@/server/api/route'
+import {isAdminRequest} from '@/lib/session'
 
-export function GET(req: NextRequest) {
-    return NextResponse.json({ isAdmin: isAdminFromRequest(req) })
-}
+export const GET = defineRoute({
+    handler: async ({req}) => ({isAdmin: await isAdminRequest(req)}),
+})

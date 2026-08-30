@@ -1,11 +1,8 @@
-import {NextRequest, NextResponse} from 'next/server'
+import {NextResponse} from 'next/server'
 import {ADMIN_COOKIE, adminCookieOptions} from '@/lib/session'
 
-export function POST(_req: NextRequest) {
+export function POST() {
     const res = NextResponse.json({ok: true})
-    res.cookies.set(ADMIN_COOKIE, '', {
-        ...adminCookieOptions,
-        maxAge: 0,
-    })
+    res.cookies.set(ADMIN_COOKIE, '', {...adminCookieOptions, maxAge: 0})
     return res
 }
