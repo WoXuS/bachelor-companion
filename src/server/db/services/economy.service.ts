@@ -1,135 +1,172 @@
+import {badRequest, notFound} from '@/lib/errors'
+import {Tx, withTx} from '../transaction'
+import {computeEffectivePrice, getShopConfig} from './pricing.service'
 import {prisma} from '../prisma'
-import {computeEffectivePrice, getShopConfig} from "@/server/db/services/pricing.service";
 
-export async function addTransaction(participantId: string, amount: number, reason: string, matchId?: string, isDoubled?: boolean) {
-    return prisma.$transaction(async (tx) => {
-        const p = await tx.participant.findUnique({where: {id: participantId}, select: {balance: true}})
-        if (!p) throw new Error('Participant not found')
+const DOUBLE_POINTS_KEY = 'double-points-4'
+const DOUBLE_POINTS_PACK = 4
 
-        const next = p.balance + amount
-        if (next < 0) throw new Error('Niewystarczające środki')
-
-        const created = await tx.transaction.create({
-            data: {
-                participantId,
-                amount,
-                reason,
-                balanceAfter: next,
-                matchId: matchId ?? null,
-                isDoubled: isDoubled ?? false
-            },
-        })
-        await tx.participant.update({where: {id: participantId}, data: {balance: next}})
-        return created
-    })
+export type LedgerEntry = {
+    participantId: string
+    amount: number
+    reason: string
+    matchId?: string | null
+    counterpartyId?: string | null
+    isDoubled?: boolean
 }
 
-const DP_KEY = 'double-points-4'
-const DP_PACK = 4
+export async function applyLedgerEntry(tx: Tx, entry: LedgerEntry) {
+    const participant = await tx.participant.findUnique({
+        where: {id: entry.participantId},
+        select: {balance: true},
+    })
+    if (!participant) throw notFound('Nie znaleziono uczestnika')
+
+    const balanceAfter = participant.balance + entry.amount
+    if (balanceAfter < 0) throw badRequest('Niewystarczające środki')
+
+    const created = await tx.transaction.create({
+        data: {
+            participantId: entry.participantId,
+            amount: entry.amount,
+            reason: entry.reason,
+            balanceAfter,
+            matchId: entry.matchId ?? null,
+            counterpartyId: entry.counterpartyId ?? null,
+            isDoubled: entry.isDoubled ?? false,
+        },
+    })
+    await tx.participant.update({
+        where: {id: entry.participantId},
+        data: {balance: balanceAfter},
+    })
+    return created
+}
+
+export function addTransaction(entry: LedgerEntry, tx?: Tx) {
+    return withTx((db) => applyLedgerEntry(db, entry), tx)
+}
+
+export function reverseMatchTransactions(matchId: string, tx?: Tx) {
+    return withTx(async (db) => {
+        const rows = await db.transaction.findMany({
+            where: {matchId},
+            select: {participantId: true, amount: true},
+        })
+        if (rows.length === 0) return
+
+        const deltaByParticipant = new Map<string, number>()
+        for (const row of rows) {
+            deltaByParticipant.set(
+                row.participantId,
+                (deltaByParticipant.get(row.participantId) ?? 0) - row.amount,
+            )
+        }
+
+        const participants = await db.participant.findMany({
+            where: {id: {in: [...deltaByParticipant.keys()]}},
+            select: {id: true, balance: true},
+        })
+        const balanceById = new Map(participants.map((p) => [p.id, p.balance]))
+
+        for (const [participantId, delta] of deltaByParticipant) {
+            if ((balanceById.get(participantId) ?? 0) + delta < 0) {
+                throw badRequest(
+                    `Nie można cofnąć – saldo uczestnika spadłoby poniżej zera (id=${participantId}).`,
+                )
+            }
+        }
+
+        for (const [participantId, delta] of deltaByParticipant) {
+            if (delta !== 0) {
+                await db.participant.update({
+                    where: {id: participantId},
+                    data: {balance: {increment: delta}},
+                })
+            }
+        }
+
+        await db.transaction.deleteMany({where: {matchId}})
+    }, tx)
+}
 
 export async function purchaseFor(participantId: string, itemId: string) {
-    const [participant, item, cfg] = await Promise.all([
-        prisma.participant.findUnique({where: {id: participantId}, select: {id: true, balance: true}}),
+    const [item, cfg] = await Promise.all([
         prisma.shopItem.findUnique({where: {id: itemId}}),
         getShopConfig(),
     ])
-    if (!participant) throw new Error('Participant not found')
-    if (!item) throw new Error('Item not found')
+    if (!item) throw notFound('Nie znaleziono przedmiotu')
 
     const {value: price, source, appliedPercent} = computeEffectivePrice(
         item.cost,
         {enabled: cfg.discountsEnabled, percent: cfg.discountPercent},
         {overrideEnabled: item.adjustOverrideEnabled, percent: item.adjustPercent},
-        'preferred'
     )
 
-    return prisma.$transaction(async (tx) => {
-        const p = await tx.participant.findUnique({where: {id: participantId}, select: {balance: true}})
-        if (!p) throw new Error('Participant not found')
-        if (p.balance - price < 0) throw new Error('Niewystarczające środki')
-
-        if (item.key === DP_KEY) {
+    return withTx(async (tx) => {
+        if (item.key === DOUBLE_POINTS_KEY) {
             await tx.participantBuff.upsert({
                 where: {participantId},
-                create: {participantId, type: 'DOUBLE_POINTS', remainingMatches: DP_PACK, active: true},
-                update: {remainingMatches: {increment: DP_PACK}, active: true, type: 'DOUBLE_POINTS'},
+                create: {
+                    participantId,
+                    type: 'DOUBLE_POINTS',
+                    remainingMatches: DOUBLE_POINTS_PACK,
+                    active: true,
+                },
+                update: {
+                    remainingMatches: {increment: DOUBLE_POINTS_PACK},
+                    active: true,
+                    type: 'DOUBLE_POINTS',
+                },
             })
         }
 
-        const reasonSuffix =
+        const suffix =
             source === 'item'
                 ? ` (override ${appliedPercent > 0 ? '+' : ''}${appliedPercent}%)`
                 : source === 'global'
-                    ? ` (${appliedPercent}% )`
+                    ? ` (${appliedPercent}%)`
                     : ''
 
-        await tx.transaction.create({
-            data: {
-                participantId,
-                amount: -price,
-                reason: `Zakup: ${item.label}${reasonSuffix}`,
-                balanceAfter: p.balance - price,
-            },
+        return applyLedgerEntry(tx, {
+            participantId,
+            amount: -price,
+            reason: `Zakup: ${item.label}${suffix}`,
         })
-        await tx.participant.update({where: {id: participantId}, data: {balance: p.balance - price}})
-
-        return true
     })
 }
 
-export async function transferBetween(
-    fromId: string,
-    toId: string,
-    amount: number,
-    reasonTo: string,
-    reasonFrom ?: string | null,
-    matchId?: string | null
+export function transferBetween(
+    params: {
+        fromId: string
+        toId: string
+        amount: number
+        reasonTo: string
+        reasonFrom?: string | null
+        matchId?: string | null
+    },
+    tx?: Tx,
 ) {
-    if (fromId === toId) throw new Error('Nie można przelać samemu sobie')
-    if (amount <= 0) throw new Error('Kwota musi być większa od zera')
+    const {fromId, toId, amount, reasonTo, reasonFrom, matchId} = params
+    if (fromId === toId) throw badRequest('Nie można przelać samemu sobie')
+    if (amount <= 0) throw badRequest('Kwota musi być większa od zera')
 
-    return prisma.$transaction(async (tx) => {
-        const [from, to] = await Promise.all([
-            tx.participant.findUnique({where: {id: fromId}, select: {balance: true}}),
-            tx.participant.findUnique({where: {id: toId}, select: {balance: true}}),
-        ])
-        if (!from || !to) throw new Error('Nie znaleziono uczestników')
-        if (from.balance < amount) throw new Error('Niewystarczające środki')
-
-        const newFrom = from.balance - amount
-        const newTo = to.balance + amount
-
-        const baseReason = (reasonFrom ?? reasonTo ?? '');
-        const reason = matchId ? baseReason : `TRANSAKCJA: ${baseReason}`;
-
-        const [txOut, txIn] = await Promise.all([
-            tx.transaction.create({
-                data: {
-                    participantId: fromId,
-                    amount: -amount,
-                    reason,
-                    balanceAfter: newFrom,
-                    counterpartyId: toId,
-                    matchId: matchId
-                },
-            }),
-            tx.transaction.create({
-                data: {
-                    participantId: toId,
-                    amount: amount,
-                    reason: matchId ? reasonTo : 'TRANSAKCJA: ' + reasonTo,
-                    balanceAfter: newTo,
-                    counterpartyId: fromId,
-                    matchId: matchId
-                },
-            }),
-        ])
-
-        await Promise.all([
-            tx.participant.update({where: {id: fromId}, data: {balance: newFrom}}),
-            tx.participant.update({where: {id: toId}, data: {balance: newTo}}),
-        ])
-
+    return withTx(async (db) => {
+        const prefix = matchId ? '' : 'TRANSAKCJA: '
+        const txOut = await applyLedgerEntry(db, {
+            participantId: fromId,
+            amount: -amount,
+            reason: `${prefix}${reasonFrom ?? reasonTo}`,
+            counterpartyId: toId,
+            matchId,
+        })
+        const txIn = await applyLedgerEntry(db, {
+            participantId: toId,
+            amount,
+            reason: `${prefix}${reasonTo}`,
+            counterpartyId: fromId,
+            matchId,
+        })
         return {txOut, txIn}
-    })
+    }, tx)
 }

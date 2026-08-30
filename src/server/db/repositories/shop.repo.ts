@@ -1,15 +1,7 @@
 import {prisma} from '../prisma'
-import {UpdateShopItemPatch} from "@/types/shop-item";
+import {UpdateShopItemPatch} from '@/types/shop-item'
 
-export function listShopItems() {
-    return prisma.shopItem.findMany({orderBy: {createdAt: 'asc'}})
-}
-
-export function getShopItem(id: string) {
-    return prisma.shopItem.findUnique({where: {id}})
-}
-
-export function createShopItem(data: { key: string; label: string; cost: number; category: string }) {
+export function createShopItem(data: {key: string; label: string; cost: number; category: string}) {
     return prisma.shopItem.create({data})
 }
 

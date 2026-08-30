@@ -1,1 +1,0 @@
-export * as ParticipantsRepo from './participants.repo'

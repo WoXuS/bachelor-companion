@@ -1,9 +1,11 @@
+import {badRequest, notFound} from '@/lib/errors'
 import {prisma} from '../prisma'
+import {Tx, withTx} from '../transaction'
 
 export function listTransactions({
-                                     participantId,
-                                     order = 'desc',
-                                 }: { participantId?: string; order?: 'asc' | 'desc' }) {
+    participantId,
+    order = 'desc',
+}: {participantId?: string; order?: 'asc' | 'desc'}) {
     return prisma.transaction.findMany({
         where: participantId ? {participantId} : undefined,
         orderBy: {createdAt: order},
@@ -14,68 +16,52 @@ export function listTransactions({
     })
 }
 
+async function loadForRollback(tx: Tx, id: string) {
+    const original = await tx.transaction.findUnique({where: {id}})
+    if (!original) throw notFound('Nie znaleziono transakcji')
 
-export function getTransaction(id: string) {
-    return prisma.transaction.findUnique({where: {id}})
+    const participant = await tx.participant.findUnique({
+        where: {id: original.participantId},
+        select: {balance: true},
+    })
+    if (!participant) throw notFound('Nie znaleziono uczestnika')
+
+    const balanceAfter = participant.balance - original.amount
+    if (balanceAfter < 0) {
+        throw badRequest(`Operacja obniżyłaby saldo poniżej zera dla ${original.participantId}.`)
+    }
+    return {original, balanceAfter}
 }
 
-export async function revertTransaction(id: string) {
-    return prisma.$transaction(async (tx) => {
-        const original = await tx.transaction.findUnique({where: {id}})
-        if (!original) throw new Error('Transaction not found')
-
-        const p = await tx.participant.findUnique({
-            where: {id: original.participantId},
-            select: {balance: true},
-        })
-        if (!p) throw new Error('Participant not found')
-
-        const newBalance = p.balance - original.amount
-        if (newBalance < 0) {
-            throw new Error(`Cofnięcie obniżyłoby saldo poniżej zera dla ${original.participantId}.`)
-        }
+export function revertTransaction(id: string) {
+    return withTx(async (tx) => {
+        const {original, balanceAfter} = await loadForRollback(tx, id)
 
         const created = await tx.transaction.create({
             data: {
                 participantId: original.participantId,
                 amount: -original.amount,
                 reason: `REVERT: ${original.reason}`,
-                balanceAfter: newBalance,
+                balanceAfter,
             },
         })
-
         await tx.participant.update({
             where: {id: original.participantId},
-            data: {balance: newBalance},
+            data: {balance: balanceAfter},
         })
-
         return created
     })
 }
 
-export async function deleteTransaction(id: string) {
-    return prisma.$transaction(async (tx) => {
-        const transaction = await tx.transaction.findUnique({where: {id}})
-        if (!transaction) throw new Error('Transaction not found')
+export function deleteTransaction(id: string) {
+    return withTx(async (tx) => {
+        const {original, balanceAfter} = await loadForRollback(tx, id)
 
-        const p = await tx.participant.findUnique({
-            where: {id: transaction.participantId},
-            select: {balance: true},
-        })
-        if (!p) throw new Error('Participant not found')
-
-        const newBalance = p.balance - transaction.amount
-        if (newBalance < 0) {
-            throw new Error(`Usunięcie obniżyłoby saldo poniżej zera dla ${transaction.participantId}.`)
-        }
-
-        await tx.transaction.delete({where: {id: transaction.id}})
-
+        await tx.transaction.delete({where: {id: original.id}})
         await tx.participant.update({
-            where: {id: transaction.participantId},
-            data: {balance: newBalance},
+            where: {id: original.participantId},
+            data: {balance: balanceAfter},
         })
-
         return {ok: true}
     })
 }

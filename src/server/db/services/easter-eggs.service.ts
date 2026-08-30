@@ -1,20 +1,15 @@
-import {prisma} from '@/server/db/prisma'
 import {Prisma, EasterEggType, Transaction} from '@prisma/client'
-import {EggClaimedEvent} from "@/server/realtime/pusher";
+import {badRequest, conflict, notFound} from '@/lib/errors'
+import {prisma} from '@/server/db/prisma'
+import {Tx, withTx} from '@/server/db/transaction'
+import {applyLedgerEntry} from '@/server/db/services/economy.service'
+import {EggClaimedEvent} from '@/server/realtime/pusher'
 
 const EGG_POINTS = 50
 
-type Tx = Prisma.TransactionClient
+type Counts = {total: number; found: number; remaining: number}
 
-type Counts = { total: number; found: number; remaining: number }
-
-async function countsForType(tx: Tx, type: EasterEggType): Promise<Counts> {
-    const total = await tx.easterEgg.count({where: {type}})
-    const found = await tx.easterEgg.count({where: {type, active: false}})
-    return {total, found, remaining: total - found}
-}
-
-type EggForApi = {
+export type EggForApi = {
     id: string
     code: string
     number: number
@@ -23,188 +18,93 @@ type EggForApi = {
     label: string | null
     placementKey: string | null
     claimedAt: Date | null
-    claimedBy: { id: string; name: string } | null
+    claimedBy: {id: string; name: string} | null
 }
 
-export async function getEggByCodeWithCounts(
-    code: string
-): Promise<{ egg: EggForApi; counts: Counts } | null> {
-    return prisma.$transaction(async (tx) => {
-        const egg = await tx.easterEgg.findUnique({
-            where: {code},
-            select: {
-                id: true,
-                code: true,
-                number: true,
-                type: true,
-                active: true,
-                label: true,
-                placementKey: true,
-                claimedAt: true,
-                claimedBy: {select: {id: true, name: true}},
-            },
-        })
+const EGG_SELECT = {
+    id: true,
+    code: true,
+    number: true,
+    type: true,
+    active: true,
+    label: true,
+    placementKey: true,
+    claimedAt: true,
+    claimedBy: {select: {id: true, name: true}},
+} satisfies Prisma.EasterEggSelect
+
+async function countsForType(tx: Tx, type: EasterEggType): Promise<Counts> {
+    const [total, found] = await Promise.all([
+        tx.easterEgg.count({where: {type}}),
+        tx.easterEgg.count({where: {type, active: false}}),
+    ])
+    return {total, found, remaining: total - found}
+}
+
+export function getEggWithCounts(
+    where: Prisma.EasterEggWhereUniqueInput,
+): Promise<{egg: EggForApi; counts: Counts} | null> {
+    return withTx(async (tx) => {
+        const egg = await tx.easterEgg.findUnique({where, select: EGG_SELECT})
         if (!egg) return null
-        const counts = await countsForType(tx, egg.type)
-        return {egg, counts}
+        return {egg, counts: await countsForType(tx, egg.type)}
     })
 }
 
-export async function getEggByIdWithCounts(
-    id: string
-): Promise<{ egg: EggForApi; counts: Counts } | null> {
-    return prisma.$transaction(async (tx) => {
-        const egg = await tx.easterEgg.findUnique({
-            where: {id},
-            select: {
-                id: true,
-                code: true,
-                number: true,
-                type: true,
-                active: true,
-                label: true,
-                placementKey: true,
-                claimedAt: true,
-                claimedBy: {select: {id: true, name: true}},
-            },
-        })
-        if (!egg) return null
-        const counts = await countsForType(tx, egg.type)
-        return {egg, counts}
-    })
-}
-
-export async function getEggByPlacement(placementKey: string) {
+export function getEggByPlacement(placementKey: string) {
     return prisma.easterEgg.findFirst({
         where: {placementKey},
-        select: {
-            id: true,
-            code: true,
-            number: true,
-            type: true,
-            active: true,
-            label: true,
-            placementKey: true,
-        },
+        select: {id: true, number: true, type: true, active: true, label: true, placementKey: true},
     })
 }
 
-export async function claimEggByCode(
-    code: string,
-    participantId: string
-): Promise<{ tx: Transaction; event: EggClaimedEvent }> {
-    return prisma.$transaction(async (tx) => {
-        const egg = await tx.easterEgg.findUnique({where: {code}})
-        if (!egg) throw new Error('Nie znaleziono jajka')
-        if (!egg.active) throw new Error('Jajko jest nieaktywne')
+export function claimEgg(
+    where: Prisma.EasterEggWhereUniqueInput,
+    participantId: string,
+): Promise<{tx: Transaction; event: EggClaimedEvent}> {
+    return withTx(async (tx) => {
+        const egg = await tx.easterEgg.findUnique({where})
+        if (!egg) throw notFound('Nie znaleziono jajka')
+        if (!egg.active) throw badRequest('Jajko jest nieaktywne')
 
-        const {total, found} = await countsForType(tx, egg.type)
-        const x = found + 1
-        const remainingAfter = total - x
         const claimedAt = new Date()
-
-        await tx.easterEgg.update({
-            where: {id: egg.id},
-            data: {active: false, claimedById: participantId, claimedAt: new Date()},
+        const claimed = await tx.easterEgg.updateMany({
+            where: {id: egg.id, active: true},
+            data: {active: false, claimedById: participantId, claimedAt},
         })
+        if (claimed.count === 0) throw conflict('Jajko zostało właśnie znalezione przez kogoś innego')
 
         const participant = await tx.participant.findUnique({
             where: {id: participantId},
-            select: {balance: true, name: true},
+            select: {name: true},
         })
-        if (!participant) throw new Error('Participant not found')
-        const next = participant.balance + EGG_POINTS
-
-        const typeLabel = egg.type === 'PHYSICAL' ? 'Fizyczny' : 'Wirtualny'
-        const reason = `${typeLabel} easter egg ${x}/${total} (pozostało: ${remainingAfter})`
-
-        const created = await tx.transaction.create({
-            data: {
-                participantId,
-                amount: EGG_POINTS,
-                reason,
-                balanceAfter: next,
-                matchId: null,
-                isDoubled: false,
-            },
-        })
-
-        await tx.participant.update({
-            where: {id: participantId},
-            data: {balance: next},
-        })
-
-        const event: EggClaimedEvent = {
-            type: egg.type,
-            number: egg.number,
-            label: egg.label ?? null,
-            participantName: participant.name,
-            claimedAt: claimedAt.toISOString(),
-            counts: {total, remaining: remainingAfter}
-        }
-
-        return {tx: created, event}
-    })
-}
-
-export async function claimEggById(
-    id: string,
-    participantId: string
-): Promise<{ tx: Transaction; event: EggClaimedEvent }> {
-    return prisma.$transaction(async (tx) => {
-        const egg = await tx.easterEgg.findUnique({where: {id}})
-        if (!egg) throw new Error('Nie znaleziono jajka')
-        if (!egg.active) throw new Error('Jajko jest nieaktywne')
+        if (!participant) throw notFound('Nie znaleziono uczestnika')
 
         const {total, found} = await countsForType(tx, egg.type)
-        const x = found + 1
-        const remainingAfter = total - x
-        const claimedAt = new Date()
-        await tx.easterEgg.update({
-            where: {id: egg.id},
-            data: {active: false, claimedById: participantId, claimedAt: new Date()},
-        })
-
-        const participant = await tx.participant.findUnique({
-            where: {id: participantId},
-            select: {balance: true, name: true},
-        })
-        if (!participant) throw new Error('Participant not found')
-        const next = participant.balance + EGG_POINTS
-
+        const remaining = total - found
         const typeLabel = egg.type === 'PHYSICAL' ? 'Fizyczny' : 'Wirtualny'
-        const reason = `${typeLabel} easter egg ${x}/${total} (pozostało: ${remainingAfter})`
 
-        const created = await tx.transaction.create({
-            data: {
-                participantId,
-                amount: EGG_POINTS,
-                reason,
-                balanceAfter: next,
-                matchId: null,
-                isDoubled: false,
+        const created = await applyLedgerEntry(tx, {
+            participantId,
+            amount: EGG_POINTS,
+            reason: `${typeLabel} easter egg ${found}/${total} (pozostało: ${remaining})`,
+        })
+
+        return {
+            tx: created,
+            event: {
+                type: egg.type,
+                number: egg.number,
+                label: egg.label,
+                participantName: participant.name,
+                claimedAt: claimedAt.toISOString(),
+                counts: {total, remaining},
             },
-        })
-
-        await tx.participant.update({
-            where: {id: participantId},
-            data: {balance: next},
-        })
-
-        const event: EggClaimedEvent = {
-            type: egg.type,
-            number: egg.number,
-            label: egg.label ?? null,
-            participantName: participant.name,
-            claimedAt: claimedAt.toISOString(),
-            counts: {total, remaining: remainingAfter}
         }
-
-        return {tx: created, event}
     })
 }
 
-export async function reactivateEgg(id: string) {
+export function reactivateEgg(id: string) {
     return prisma.easterEgg.update({
         where: {id},
         data: {active: true, claimedAt: null, claimedById: null},
@@ -212,15 +112,22 @@ export async function reactivateEgg(id: string) {
     })
 }
 
-export async function assignPlacement(id: string, placementKey: string | null) {
-    if (placementKey) {
-        await prisma.easterEgg.updateMany({
-            where: {placementKey},
-            data: {placementKey: null},
+export function assignPlacement(id: string, placementKey: string | null) {
+    return withTx(async (tx) => {
+        if (placementKey) {
+            await tx.easterEgg.updateMany({where: {placementKey}, data: {placementKey: null}})
+        }
+        return tx.easterEgg.update({
+            where: {id},
+            data: {placementKey},
+            select: {id: true, placementKey: true},
         })
-    }
-    return prisma.easterEgg.update({
-        where: {id},
-        data: {placementKey},
+    })
+}
+
+export function listEggsForAdmin() {
+    return prisma.easterEgg.findMany({
+        orderBy: [{type: 'asc'}, {number: 'asc'}],
+        select: EGG_SELECT,
     })
 }

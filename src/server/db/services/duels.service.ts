@@ -1,65 +1,98 @@
+import {badRequest, notFound} from '@/lib/errors'
 import {prisma} from '../prisma'
-import {addTransaction, transferBetween} from './economy.service'
+import {withTx} from '../transaction'
+import {reverseMatchTransactions, transferBetween} from './economy.service'
 
-export async function createDuel(params: {
+export function createDuel(params: {
     title: string
     stake: number
     playerAId: string
     playerBId: string
 }) {
-    const {title, stake, playerAId, playerBId} = params
-    if (playerAId === playerBId) throw new Error('Ten sam gracz po obu stronach')
-    return prisma.duel.create({data: {title, stake, playerAId, playerBId}})
+    if (params.playerAId === params.playerBId) throw badRequest('Ten sam gracz po obu stronach')
+    return prisma.duel.create({data: params})
 }
 
-export async function reportDuel(params: { id: string; winner: 'A' | 'B'; scoreA?: number; scoreB?: number }) {
+export function reportDuel(params: {id: string; winner: 'A' | 'B'; scoreA?: number; scoreB?: number}) {
     const {id, winner, scoreA, scoreB} = params
-    return prisma.$transaction(async (tx) => {
-        const d = await tx.duel.findUnique({where: {id}})
-        if (!d) throw new Error('Pojedynek nie znaleziony')
-        if (d.winnerId) throw new Error('Pojedynek już rozstrzygnięty')
+    return withTx(async (tx) => {
+        const duel = await tx.duel.findUnique({where: {id}})
+        if (!duel) throw notFound('Pojedynek nie znaleziony')
+        if (duel.winnerId) throw badRequest('Pojedynek już rozstrzygnięty')
 
-        const winnerId = winner === 'A' ? d.playerAId : d.playerBId
-        const loserId = winner === 'A' ? d.playerBId : d.playerAId
+        const winnerId = winner === 'A' ? duel.playerAId : duel.playerBId
+        const loserId = winner === 'A' ? duel.playerBId : duel.playerAId
 
-        const loser = await tx.participant.findUnique({where: {id: loserId}, select: {balance: true}})
-        if (!loser) throw new Error('Uczestnik nie znaleziony')
-        if (loser.balance < d.stake) throw new Error('Przegrany nie ma wystarczających środków')
+        const loser = await tx.participant.findUnique({
+            where: {id: loserId},
+            select: {balance: true},
+        })
+        if (!loser) throw notFound('Uczestnik nie znaleziony')
+        if (loser.balance < duel.stake) throw badRequest('Przegrany nie ma wystarczających środków')
 
         await tx.duel.update({
             where: {id},
             data: {winnerId, scoreA: scoreA ?? null, scoreB: scoreB ?? null, finishedAt: new Date()},
         })
-        await transferBetween(loserId, winnerId, d.stake, `Wygrana 1v1 - ${d.title}`, `Przegrana 1v1 - ${d.title}`, id)
+        await transferBetween(
+            {
+                fromId: loserId,
+                toId: winnerId,
+                amount: duel.stake,
+                reasonTo: `Wygrana 1v1 - ${duel.title}`,
+                reasonFrom: `Przegrana 1v1 - ${duel.title}`,
+                matchId: id,
+            },
+            tx,
+        )
         return true
     })
 }
 
+export function revertDuel(id: string) {
+    return withTx(async (tx) => {
+        const duel = await tx.duel.findUnique({where: {id}})
+        if (!duel) throw notFound('Pojedynek nie znaleziony')
 
-export async function revertDuel(id: string) {
-    return prisma.$transaction(async (tx) => {
-        const d = await tx.duel.findUnique({where: {id}})
-        if (!d) throw new Error('Pojedynek nie znaleziony')
-
-        const txs = await tx.transaction.findMany({
-            where: {matchId: id},
-            select: {participantId: true, amount: true},
-        })
-
-        if (txs.length) {
-            const deltaByUser = new Map<string, number>()
-            for (const t of txs) deltaByUser.set(t.participantId, (deltaByUser.get(t.participantId) ?? 0) - t.amount)
-            for (const [participantId, delta] of deltaByUser.entries()) {
-                await tx.participant.update({where: {id: participantId}, data: {balance: {increment: delta}}})
-            }
-            await tx.transaction.deleteMany({where: {matchId: id}})
-        }
-
-        await tx.duel.update({
+        await reverseMatchTransactions(id, tx)
+        return tx.duel.update({
             where: {id},
             data: {winnerId: null, scoreA: null, scoreB: null, finishedAt: null},
         })
+    })
+}
 
-        return true
+export function deleteDuel(id: string) {
+    return withTx(async (tx) => {
+        await reverseMatchTransactions(id, tx)
+        await tx.duel.delete({where: {id}})
+        return {ok: true}
+    })
+}
+
+export function updateDuel(
+    id: string,
+    patch: {title?: string; stake?: number; playerAId?: string; playerBId?: string},
+) {
+    return withTx(async (tx) => {
+        const duel = await tx.duel.findUnique({where: {id}})
+        if (!duel) throw notFound('Pojedynek nie znaleziony')
+
+        const started = !!duel.winnerId || duel.scoreA != null || duel.scoreB != null
+        const data: {title?: string; stake?: number; playerAId?: string; playerBId?: string} = {}
+
+        if (patch.title !== undefined) data.title = patch.title
+        if (patch.stake !== undefined) data.stake = patch.stake
+
+        if (!started) {
+            if (patch.playerAId !== undefined) data.playerAId = patch.playerAId
+            if (patch.playerBId !== undefined) data.playerBId = patch.playerBId
+
+            const playerA = data.playerAId ?? duel.playerAId
+            const playerB = data.playerBId ?? duel.playerBId
+            if (playerA === playerB) throw badRequest('Ten sam gracz po obu stronach')
+        }
+
+        return tx.duel.update({where: {id}, data})
     })
 }

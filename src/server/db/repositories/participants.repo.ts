@@ -1,15 +1,16 @@
-import { prisma } from '../prisma'
+import {prisma} from '../prisma'
 
-export function listParticipants() {
-    return prisma.participant.findMany({ where: { active: true }, orderBy: { createdAt: 'asc' } })
+export function listAllParticipants() {
+    return prisma.participant.findMany({orderBy: {createdAt: 'asc'}})
 }
-export function getParticipant(id: string) {
-    return prisma.participant.findUnique({ where: { id } })
+
+export function upsertParticipant(data: {id?: string; name: string; avatarUrl?: string | null}) {
+    const values = {name: data.name, avatarUrl: data.avatarUrl ?? null}
+    return data.id
+        ? prisma.participant.update({where: {id: data.id}, data: values})
+        : prisma.participant.create({data: {...values, active: true}})
 }
-export function upsertParticipant(data: { id?: string; name: string; avatarUrl?: string | null; active?: boolean }) {
-    return prisma.participant.upsert({
-        where: { id: data.id ?? '' },
-        update: { name: data.name, avatarUrl: data.avatarUrl ?? null, active: data.active ?? true },
-        create: { name: data.name, avatarUrl: data.avatarUrl ?? null, active: data.active ?? true },
-    })
+
+export function deleteParticipant(id: string) {
+    return prisma.participant.delete({where: {id}})
 }

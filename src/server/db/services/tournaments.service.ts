@@ -1,8 +1,10 @@
-import {prisma} from '../prisma'
+import {Match, Tournament} from '@prisma/client'
+import {tournamentStarted} from '../repositories/tournaments.repo'
+import {badRequest, notFound} from '@/lib/errors'
+import {Tx, withTx} from '../transaction'
 import {addTransaction} from './economy.service'
-import {Prisma, TournamentTeamMember, Match, Tournament} from '@prisma/client'
-import {NextResponse} from "next/server";
-import {TMatch} from "@/types/tournament";
+import {TMatch} from '@/types/tournament'
+import {bestOfForRound, bracketOrder, buildSingleElim, nextPowerOfTwo, shuffle} from '@/lib/bracket'
 
 type MatchForLogic = Pick<
     Match,
@@ -29,13 +31,6 @@ type TournamentForLogic = Pick<
     'id' | 'type' | 'title' | 'mainPrize' | 'consolationPrize'
 >
 
-function shuffle<T>(arr: T[]) {
-    return arr
-        .map(v => [Math.random(), v] as const)
-        .sort((a, b) => a[0] - b[0])
-        .map(([, v]) => v)
-}
-
 export async function createTeamTournament(params: {
     title: string
     mainPrize: number
@@ -44,7 +39,7 @@ export async function createTeamTournament(params: {
     teamB: { name: string; memberIds: string[] }
 }) {
     const {title, mainPrize, teamA, teamB} = params
-    return prisma.$transaction(async (tx) => {
+    return withTx(async (tx) => {
         const t = await tx.tournament.create({
             data: {title, type: 'TEAM', mainPrize, matchWinPrize: 0},
         })
@@ -62,16 +57,6 @@ export async function createTeamTournament(params: {
         return t
     })
 }
-
-async function getTeamMemberIds(tx: Tx, teamId: string): Promise<string[]> {
-    const members = await tx.tournamentTeamMember.findMany({
-        where: {teamId},
-        select: {participantId: true},
-    })
-    return members.map(m => m.participantId)
-}
-
-type Tx = Prisma.TransactionClient
 
 const BRACKET_LABEL: Record<'WINNERS' | 'LOSERS' | 'GRAND_FINAL', string> = {
     WINNERS: 'drab. wygranych',
@@ -142,11 +127,11 @@ async function winnerParticipantIds(
 ): Promise<string[]> {
     if (isSoloMatch(m)) {
         const pid = winner === 'A' ? m.participantAId : m.participantBId
-        if (!pid) throw new Error('Brak uczestnika po wybranej stronie')
+        if (!pid) throw badRequest('Brak uczestnika po wybranej stronie')
         return [pid]
     } else {
         const tid = winner === 'A' ? m.teamAId : m.teamBId
-        if (!tid) throw new Error('Brak zespołu po wybranej stronie')
+        if (!tid) throw badRequest('Brak zespołu po wybranej stronie')
         return teamMemberIds(tx, tid)
     }
 }
@@ -161,12 +146,12 @@ async function setMatchWinner(
     const base = {scoreA: scoreA ?? null, scoreB: scoreB ?? null}
     if (isSoloMatch(m)) {
         const winnerParticipantId = winner === 'A' ? m.participantAId : m.participantBId
-        if (!winnerParticipantId) throw new Error('Brak uczestnika po wybranej stronie')
+        if (!winnerParticipantId) throw badRequest('Brak uczestnika po wybranej stronie')
         await tx.match.update({where: {id: m.id}, data: {...base, winnerParticipantId}})
         return {winnerParticipantId, winnerTeamId: null}
     } else {
         const winnerTeamId = winner === 'A' ? m.teamAId : m.teamBId
-        if (!winnerTeamId) throw new Error('Brak zespołu po wybranej stronie')
+        if (!winnerTeamId) throw badRequest('Brak zespołu po wybranej stronie')
         await tx.match.update({where: {id: m.id}, data: {...base, winnerTeamId}})
         return {winnerParticipantId: null, winnerTeamId}
     }
@@ -192,11 +177,17 @@ async function advanceWinner(tx: Tx, m: MatchForLogic, winner: 'A' | 'B') {
 }
 
 async function payWithDP(tx: Tx, participantId: string, baseAmount: number, description: string, matchId: string) {
-    let amount = baseAmount
-    const dp = await getActiveDP(tx, participantId)
-    const doubled = !!dp
-    if (doubled) amount *= 2
-    await addTransaction(participantId, amount, description, matchId, doubled)
+    const doubled = !!(await getActiveDP(tx, participantId))
+    await addTransaction(
+        {
+            participantId,
+            amount: doubled ? baseAmount * 2 : baseAmount,
+            reason: description,
+            matchId,
+            isDoubled: doubled,
+        },
+        tx,
+    )
 }
 
 async function payMany(tx: Tx, participantIds: string[], baseAmount: number, description: string, matchId: string) {
@@ -267,19 +258,16 @@ async function participantsWhoPlayed(tx: Tx, m: MatchForLogic): Promise<string[]
 }
 
 export async function reportMatch(params: { matchId: string; winner: 'A' | 'B'; scoreA?: number; scoreB?: number }) {
-    return prisma.$transaction(async (tx) => {
+    return withTx(async (tx) => {
         const m = await tx.match.findUnique({where: {id: params.matchId}})
-        if (!m) throw new Error('Mecz nie znaleziony')
+        if (!m) throw notFound('Mecz nie znaleziony')
 
         const t = await tx.tournament.findUnique({where: {id: m.tournamentId}})
-        if (!t) throw new Error('Turniej nie znaleziony')
+        if (!t) throw notFound('Turniej nie znaleziony')
 
         const playIn = await isPlayInMatch(tx, m)
 
-        const {
-            winnerParticipantId,
-            winnerTeamId
-        } = await setMatchWinner(tx, m, params.winner, params.scoreA, params.scoreB)
+        await setMatchWinner(tx, m, params.winner, params.scoreA, params.scoreB)
         await advanceWinner(tx, m, params.winner)
 
         if (!playIn && t.matchWinPrize > 0 && await shouldPayWinPrize(tx, m)) {
@@ -305,40 +293,20 @@ export async function reportMatch(params: { matchId: string; winner: 'A' | 'B'; 
     })
 }
 
-type SeedPair = { A: string | null; B: string | null }
-
-function buildSingleElim(participantIds: string[]): SeedPair[][] {
-    const n = participantIds.length
-    const pow2 = 1 << Math.ceil(Math.log2(Math.max(2, n)))
-    const byes = pow2 - n
-    const seeded = [...participantIds, ...Array(byes).fill(null)]
-    const rounds: SeedPair[][] = []
-    const r1: SeedPair[] = []
-    for (let i = 0; i < pow2; i += 2) r1.push({A: seeded[i], B: seeded[i + 1]})
-    rounds.push(r1)
-
-    let matches = r1.length
-    while (matches > 1) {
-        matches = Math.floor(matches / 2)
-        rounds.push(Array.from({length: matches}, () => ({A: null, B: null})))
-    }
-    return rounds
-}
-
-async function autoAdvanceByes(tournamentId: string) {
-    const r1 = await prisma.match.findMany({
+async function autoAdvanceByes(tx: Tx, tournamentId: string) {
+    const r1 = await tx.match.findMany({
         where: {tournamentId, round: 1, isBye: true},
         select: {id: true, participantAId: true, participantBId: true, nextMatchId: true, nextMatchSlot: true},
     })
     for (const m of r1) {
         const winnerPid = m.participantAId ?? m.participantBId
         if (!winnerPid) continue
-        await prisma.match.update({
+        await tx.match.update({
             where: {id: m.id},
             data: {winnerParticipantId: winnerPid, scoreA: 1, scoreB: 0},
         })
         if (m.nextMatchId && m.nextMatchSlot) {
-            await prisma.match.update({
+            await tx.match.update({
                 where: {id: m.nextMatchId},
                 data:
                     m.nextMatchSlot === 'A'
@@ -353,18 +321,7 @@ type Entrant =
     | { kind: 'player'; id: string }
     | { kind: 'fromMatch'; matchId: string; winnerId?: string }
 
-function bracketOrder(n: number): number[] {
-    if (n === 1) return [1]
-    const half = bracketOrder(n / 2)
-    const mirror = half.map(s => n + 1 - s)
-    const out: number[] = []
-    for (let i = 0; i < half.length; i++) {
-        out.push(half[i], mirror[i])
-    }
-    return out
-}
-
-export async function createSoloTournamentCompact(params: {
+export async function createSoloTournament(params: {
     title: string
     mainPrize: number
     matchWinPrize: number
@@ -373,7 +330,7 @@ export async function createSoloTournamentCompact(params: {
 }) {
     const ids = [...params.participantIds]
 
-    return prisma.$transaction(async (tx) => {
+    return withTx(async (tx) => {
         const t = await tx.tournament.create({
             data: {
                 title: params.title,
@@ -389,7 +346,7 @@ export async function createSoloTournamentCompact(params: {
         })
 
         const n = ids.length
-        const pow2Up = 1 << Math.ceil(Math.log2(Math.max(2, n)))
+        const pow2Up = nextPowerOfTwo(n)
         const pairsCountR0 = pow2Up / 2
         const order = bracketOrder(pow2Up)
 
@@ -498,15 +455,13 @@ export async function createSoloTournamentCompact(params: {
         const maxRound = roundIds.length
         await Promise.all(
             roundIds.flatMap((idsInRound, rIdx) => {
-                const r = rIdx + 1
-                const bo = r === maxRound ? 5 : r <= 2 ? 1 : 3
-                return idsInRound.map((id) => tx.match.update({where: {id}, data: {bestOf: bo}}))
+                const bestOf = bestOfForRound(rIdx + 1, maxRound)
+                return idsInRound.map((id) => tx.match.update({where: {id}, data: {bestOf}}))
             })
         )
 
         return t
-    },{timeout:60_000}
-                              )
+    }, undefined, {timeout: 60_000})
 }
 
 function startedLite(m: { isBye: boolean; winnerParticipantId: string | null }) {
@@ -517,13 +472,13 @@ export async function createConsolationBracket(
     tournamentId: string,
     defaultBestOf: 1 | 3 | 5 = 1
 ) {
-    return prisma.$transaction(async (tx: Tx) => {
+    return withTx(async (tx) => {
         const t = await tx.tournament.findUnique({where: {id: tournamentId}})
-        if (!t) throw new Error('Turniej nie znaleziony')
-        if (t.type !== 'SOLO') throw new Error('Drabinka przegranych tylko dla turniejów SOLO')
+        if (!t) throw notFound('Turniej nie znaleziony')
+        if (t.type !== 'SOLO') throw badRequest('Drabinka przegranych tylko dla turniejów SOLO')
 
         const exists = await tx.match.count({where: {tournamentId, bracket: 'LOSERS'}})
-        if (exists > 0) throw new Error('Drabinka przegranych już istnieje')
+        if (exists > 0) throw badRequest('Drabinka przegranych już istnieje')
 
         const wins = await tx.match.findMany({
             where: {tournamentId, bracket: 'WINNERS'},
@@ -533,7 +488,7 @@ export async function createConsolationBracket(
                 participantAId: true, participantBId: true, winnerParticipantId: true,
             },
         })
-        if (!wins.length) throw new Error('Brak meczów w drabince wygranych')
+        if (!wins.length) throw badRequest('Brak meczów w drabince wygranych')
 
         const byRound = new Map<number, typeof wins>()
         for (const m of wins) {
@@ -552,11 +507,11 @@ export async function createConsolationBracket(
                 break
             }
         }
-        if (!firstNoByeRound) throw new Error('Nie znaleziono rundy drabinki wygranych bez auto-awansów')
+        if (!firstNoByeRound) throw badRequest('Nie znaleziono rundy drabinki wygranych bez auto-awansów')
 
         const winnersMain = byRound.get(firstNoByeRound)!
         if (!winnersMain.every(m => m.winnerParticipantId)) {
-            throw new Error(`Najpierw zakończ wszystkie mecze w rundzie ${firstNoByeRound} (WINNERS)`)
+            throw badRequest(`Najpierw zakończ wszystkie mecze w rundzie ${firstNoByeRound} (WINNERS)`)
         }
 
         const losers: string[] = []
@@ -569,7 +524,7 @@ export async function createConsolationBracket(
         for (const m of winnersMain) pushLoser(m)
 
         const uniqLosers = Array.from(new Set(losers))
-        if (uniqLosers.length < 2) throw new Error('Za mało przegranych do wygenerowania drabinki')
+        if (uniqLosers.length < 2) throw badRequest('Za mało przegranych do wygenerowania drabinki')
 
         const seeds = await tx.participant.findMany({
             where: {id: {in: uniqLosers}},
@@ -591,7 +546,7 @@ export async function createConsolationBracket(
             entrants: Entrant[],
             opts: { bracket: 'LOSERS'; isPlayIn: boolean; bestOf: 1 | 3 | 5 }
         ) {
-            if (entrants.length % 2 !== 0) throw new Error(`Niezgodna liczba slotów w rundzie ${roundNo}`)
+            if (entrants.length % 2 !== 0) throw badRequest(`Niezgodna liczba slotów w rundzie ${roundNo}`)
             const ids: string[] = []
             const newMatches: { id: string }[] = []
 
@@ -635,7 +590,7 @@ export async function createConsolationBracket(
             const entrantsL0: Entrant[] = []
             for (let i = 0; i < l0Pool.length; i += 2) {
                 const a = l0Pool[i], b = l0Pool[i + 1]
-                if (!a || !b) throw new Error('Nieprawidłowa liczba graczy w L0')
+                if (!a || !b) throw badRequest('Nieprawidłowa liczba graczy w L0')
                 entrantsL0.push({kind: 'player', id: a}, {kind: 'player', id: b})
             }
             const l0Ids = await createRound(roundNo, entrantsL0, {
@@ -658,7 +613,7 @@ export async function createConsolationBracket(
         for (let i = k; i < fixedL1.length; i++) slotsL1.push({kind: 'player', id: fixedL1[i]})
         for (let i = k; i < winnersFromL0.length; i++) slotsL1.push(winnersFromL0[i])
 
-        if (slotsL1.length % 2 !== 0) throw new Error('Niezgodna liczba graczy w L1 (nieparzysta)')
+        if (slotsL1.length % 2 !== 0) throw badRequest('Niezgodna liczba graczy w L1 (nieparzysta)')
 
         const l1Ids = await createRound(roundNo, slotsL1, {bracket: 'LOSERS', isPlayIn: false, bestOf: defaultBestOf})
         createdByRound.push(l1Ids)
@@ -682,18 +637,18 @@ export async function createConsolationBracket(
 
 
 export async function reseedRound1(tournamentId: string) {
-    return prisma.$transaction(async (tx) => {
+    return withTx(async (tx) => {
         const t = await tx.tournament.findUnique({where: {id: tournamentId}})
-        if (!t) throw new Error('Turniej nie znaleziony')
-        if (t.type !== 'SOLO') throw new Error('Reseed tylko dla turniejów SOLO')
+        if (!t) throw notFound('Turniej nie znaleziony')
+        if (t.type !== 'SOLO') throw badRequest('Reseed tylko dla turniejów SOLO')
         const round = 1
-        const editable = await prisma.match.findMany({
-            where: {tournamentId: tournamentId, round: round, bracket: 'WINNERS', isBye: false},
+        const editable = await tx.match.findMany({
+            where: {tournamentId, round, bracket: 'WINNERS', isBye: false},
             select: {id: true, winnerParticipantId: true, scoreA: true, scoreB: true}
         })
 
         const started = editable.some(m => m.winnerParticipantId || m.scoreA != null || m.scoreB != null)
-        if (started) return NextResponse.json({message: 'Runda 0 rozpoczęta, edycja zablokowana'}, {status: 400})
+        if (started) throw badRequest('Runda 0 rozpoczęta, edycja zablokowana')
 
         const picks = await tx.tournamentParticipant.findMany({
             where: {tournamentId},
@@ -717,8 +672,116 @@ export async function reseedRound1(tournamentId: string) {
             })
         }
 
-        await autoAdvanceByes(tournamentId)
+        await autoAdvanceByes(tx, tournamentId)
         return true
     })
 }
 
+
+export function updateTournamentBasics(
+    id: string,
+    patch: {title?: string; mainPrize?: number; matchWinPrize?: number; consolationPrize?: number},
+) {
+    return withTx(async (tx) => {
+        const started = await tournamentStarted(id)
+        const data: typeof patch = {}
+
+        if (patch.title !== undefined) data.title = patch.title
+        if (patch.mainPrize !== undefined) data.mainPrize = patch.mainPrize
+
+        if (!started) {
+            if (patch.matchWinPrize !== undefined) data.matchWinPrize = patch.matchWinPrize
+            if (patch.consolationPrize !== undefined) data.consolationPrize = patch.consolationPrize
+        }
+
+        return tx.tournament.update({where: {id}, data})
+    })
+}
+
+type EntrantsInput = {participantIds: string[]} | {teamA: TeamInput; teamB: TeamInput}
+type TeamInput = {name: string; memberIds: string[]}
+
+export function replaceTournamentEntrants(id: string, input: EntrantsInput) {
+    return withTx(async (tx) => {
+        const tournament = await tx.tournament.findUnique({where: {id}})
+        if (!tournament) throw notFound('Turniej nie znaleziony')
+        if (await tournamentStarted(id)) throw badRequest('Turniej już wystartował')
+
+        if (tournament.type === 'SOLO') {
+            if (!('participantIds' in input)) throw badRequest('Oczekiwano listy uczestników')
+            await tx.tournamentParticipant.deleteMany({where: {tournamentId: id}})
+            if (input.participantIds.length > 0) {
+                await tx.tournamentParticipant.createMany({
+                    data: input.participantIds.map((participantId) => ({tournamentId: id, participantId})),
+                })
+            }
+            return
+        }
+
+        if (!('teamA' in input)) throw badRequest('Oczekiwano dwóch zespołów')
+        const teams = await tx.tournamentTeam.findMany({
+            where: {tournamentId: id},
+            orderBy: {createdAt: 'asc'},
+        })
+        if (teams.length !== 2) throw badRequest('Oczekiwano 2 zespołów')
+
+        await tx.tournamentTeam.update({where: {id: teams[0].id}, data: {name: input.teamA.name}})
+        await tx.tournamentTeam.update({where: {id: teams[1].id}, data: {name: input.teamB.name}})
+        await tx.tournamentTeamMember.deleteMany({
+            where: {teamId: {in: [teams[0].id, teams[1].id]}},
+        })
+        await tx.tournamentTeamMember.createMany({
+            data: [
+                ...input.teamA.memberIds.map((participantId) => ({teamId: teams[0].id, participantId})),
+                ...input.teamB.memberIds.map((participantId) => ({teamId: teams[1].id, participantId})),
+            ],
+        })
+    })
+}
+
+export function reseedPairs(
+    tournamentId: string,
+    round: number,
+    pairs: Array<{matchId: string; participantAId: string | null; participantBId: string | null}>,
+) {
+    return withTx(async (tx) => {
+        const editable = await tx.match.findMany({
+            where: {tournamentId, round, bracket: 'WINNERS', isBye: false},
+            select: {id: true, winnerParticipantId: true, scoreA: true, scoreB: true},
+        })
+
+        const started = editable.some(
+            (m) => m.winnerParticipantId || m.scoreA != null || m.scoreB != null,
+        )
+        if (started) throw badRequest('Runda rozpoczęta, edycja zablokowana')
+
+        const editableIds = new Set(editable.map((m) => m.id))
+        for (const pair of pairs) {
+            if (!editableIds.has(pair.matchId)) {
+                throw badRequest('Nie można edytować meczu (auto-awans)')
+            }
+        }
+
+        const seen = new Set<string>()
+        for (const pair of pairs) {
+            for (const participantId of [pair.participantAId, pair.participantBId]) {
+                if (!participantId) continue
+                if (seen.has(participantId)) throw badRequest('Ten sam uczestnik w wielu slotach')
+                seen.add(participantId)
+            }
+        }
+
+        for (const pair of pairs) {
+            await tx.match.update({
+                where: {id: pair.matchId},
+                data: {
+                    participantAId: pair.participantAId,
+                    participantBId: pair.participantBId,
+                    scoreA: null,
+                    scoreB: null,
+                    winnerParticipantId: null,
+                },
+            })
+        }
+    })
+}

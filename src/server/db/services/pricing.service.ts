@@ -1,108 +1,96 @@
 import {prisma} from '../prisma'
 
-export type RoundingMode = 'step' | 'preferred'
+export type PricingSource = 'item' | 'global' | 'none'
+export type EffectivePrice = {value: number; source: PricingSource; appliedPercent: number}
 
-export async function getShopConfig() {
-    const cfg = await prisma.shopConfig.findUnique({where: {id: 'singleton'}})
-    return cfg ?? {discountsEnabled: false, discountPercent: 20}
+type RoundDirection = 'down' | 'up' | 'nearest'
+
+const DEFAULT_CONFIG = {discountsEnabled: false, discountPercent: 20}
+const MAX_ROUNDING_SPAN = 200
+
+export function isReachableWithNotes(amount: number): boolean {
+    if (amount < 0) return false
+    if (amount === 0) return true
+    if (amount % 10 !== 0) return false
+    return amount !== 10 && amount !== 30
 }
 
-type RoundDir = 'down' | 'up' | 'nearest'
-type RoundMode = 'preferred' | 'nearest20'
-
-export function isReachableWithNotes(n: number): boolean {
-    if (n < 0) return false
-    if (n === 0) return true
-    if (n % 10 !== 0) return false
-    if (n === 10 || n === 30) return false
-    return true
-}
-
-
-export function roundToPreferred(amount: number, direction: RoundDir = 'nearest'): number {
+export function roundToPreferred(amount: number, direction: RoundDirection = 'nearest'): number {
     if (amount < 0) return 0
-    const a = Math.round(amount)
+    const target = Math.round(amount)
+    if (isReachableWithNotes(target)) return target
 
-    if (isReachableWithNotes(a)) return a
-
-    const maxSpan = 200
-    const step = 1
-    if (direction === 'down') {
-        for (let d = 0; d <= maxSpan; d += step) {
-            const v = a - d
-            if (v < 0) return 0
-            if (isReachableWithNotes(v)) return v
-        }
-    } else if (direction === 'up') {
-        for (let d = 0; d <= maxSpan; d += step) {
-            const v = a + d
-            if (isReachableWithNotes(v)) return v
-        }
-    } else {
-        for (let d = 0; d <= maxSpan; d += step) {
-            const down = a - d
-            const up = a + d
-            const downOk = isReachableWithNotes(down)
-            const upOk = isReachableWithNotes(up)
-            if (downOk && upOk) return down
-            if (downOk) return down
-            if (upOk) return up
-        }
+    for (let delta = 1; delta <= MAX_ROUNDING_SPAN; delta++) {
+        const down = target - delta
+        const up = target + delta
+        if (direction !== 'up' && isReachableWithNotes(down)) return down
+        if (direction !== 'down' && isReachableWithNotes(up)) return up
+        if (direction === 'down' && down < 0) return 0
     }
-    return a
-}
-
-export function roundNearest20(n: number): number {
-    if (n <= 0) return 0
-    return Math.round(n / 20) * 20
-}
-
-function applyPercent(base: number, percent: number): number {
-    return Math.round(base * (1 + percent / 100))
+    return target
 }
 
 export function computeEffectivePrice(
     baseCost: number,
-    global: { enabled: boolean; percent: number },
-    item: { overrideEnabled: boolean; percent: number },
-    mode: RoundMode = 'preferred'
-): { value: number; source: 'item' | 'global' | 'none'; appliedPercent: number } {
-    let applied = 0
-    let source: 'item' | 'global' | 'none' = 'none'
+    global: {enabled: boolean; percent: number},
+    item: {overrideEnabled: boolean; percent: number},
+): EffectivePrice {
+    let appliedPercent = 0
+    let source: PricingSource = 'none'
 
     if (item.overrideEnabled && item.percent !== 0) {
-        applied = item.percent
+        appliedPercent = item.percent
         source = 'item'
     } else if (global.enabled && global.percent > 0) {
-        applied = -global.percent
+        appliedPercent = -global.percent
         source = 'global'
     }
 
-    const raw = applied ? applyPercent(baseCost, applied) : baseCost
-    const dir: RoundDir = applied < 0 ? 'down' : applied > 0 ? 'up' : 'nearest'
-
-    let value = raw
-    if (mode === 'preferred') {
-        value = roundToPreferred(raw, dir)
-    } else {
-        value = roundNearest20(raw)
+    if (appliedPercent === 0) {
+        return {value: roundToPreferred(baseCost), source, appliedPercent}
     }
-    if (value < 0) value = 0
 
-    return {value, source, appliedPercent: applied}
+    const raw = Math.round(baseCost * (1 + appliedPercent / 100))
+    const direction: RoundDirection = appliedPercent < 0 ? 'down' : 'up'
+    return {value: Math.max(0, roundToPreferred(raw, direction)), source, appliedPercent}
 }
 
-export function applyDiscountRounded(
-    baseCost: number,
-    discountsEnabled: boolean,
-    discountPercent: number,
-    opts?: { mode?: RoundMode }
-): number {
-    const {value} = computeEffectivePrice(
-        baseCost,
-        {enabled: discountsEnabled, percent: discountPercent},
-        {overrideEnabled: false, percent: 0},
-        opts?.mode ?? 'preferred'
-    )
-    return value
+export async function getShopConfig() {
+    const cfg = await prisma.shopConfig.findUnique({where: {id: 'singleton'}})
+    return cfg ?? DEFAULT_CONFIG
+}
+
+export function updateShopConfig(patch: {discountsEnabled?: boolean; discountPercent?: number}) {
+    return prisma.shopConfig.upsert({
+        where: {id: 'singleton'},
+        update: patch,
+        create: {
+            id: 'singleton',
+            discountsEnabled: patch.discountsEnabled ?? DEFAULT_CONFIG.discountsEnabled,
+            discountPercent: patch.discountPercent ?? DEFAULT_CONFIG.discountPercent,
+        },
+    })
+}
+
+export async function listShopItemsWithPricing() {
+    const [cfg, items] = await Promise.all([
+        getShopConfig(),
+        prisma.shopItem.findMany({orderBy: {label: 'asc'}}),
+    ])
+
+    return items.map((item) => {
+        const {value, source, appliedPercent} = computeEffectivePrice(
+            item.cost,
+            {enabled: cfg.discountsEnabled, percent: cfg.discountPercent},
+            {overrideEnabled: item.adjustOverrideEnabled, percent: item.adjustPercent},
+        )
+        return {
+            ...item,
+            effectiveCost: value,
+            pricingSource: source,
+            appliedPercent,
+            discountsEnabled: cfg.discountsEnabled,
+            discountPercent: cfg.discountPercent,
+        }
+    })
 }
