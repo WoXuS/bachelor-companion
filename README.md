@@ -19,6 +19,11 @@ needed to get from an arbitrary number of losers down to a power of two, and wir
 `nextMatchSlot` pointers so results propagate forward on their own. Best-of escalates by round: 1
 early, 3 in the middle, 5 in the final.
 
+![Tournament bracket](docs/screenshots/bracket.png)
+
+*Twelve players padded to sixteen slots: four auto-advanced byes in the qualifying round, per-match
+payouts, and best-of rising to 5 in the final.*
+
 **A ledger that always balances.** Every currency movement goes through a single `applyLedgerEntry`
 helper that reads the balance, refuses to overdraw, writes a `Transaction` row carrying
 `balanceAfter`, and updates the participant — all inside one database transaction. Because every
@@ -29,9 +34,31 @@ operation: net the entries per participant, verify nobody drops below zero, appl
 — match, duel, quiz answer, tournament deletion — can be undone, and undoing restores the
 double-points buffs that the original action consumed.
 
+![Transaction history](docs/screenshots/transactions.png)
+
+*Every row carries the balance it produced. The greyed-out controls on the second entry are a
+reversal the ledger refuses, because undoing it would push that participant below zero.*
+
 **Purchasable sabotage.** The shop sells both buffs and troll items, with prices adjusted by a global
 discount or a per-item override, then rounded to amounts the physical play-money can actually make
 (no 10s or 30s — see `isReachableWithNotes`).
+
+![Shop pricing](docs/screenshots/shop.png)
+
+*A global −20% discount applies to everything except Double Points, where a per-item override wins
+and pushes the price up instead. Each badge shows which rule produced the number.*
+
+### The rest of it
+
+| | |
+|---|---|
+| ![Ranking](docs/screenshots/ranking.png) | ![Quiz](docs/screenshots/quiz.png) |
+| Standings with the podium and an active double-points buff. | The groom quiz, scored live, with an undo for the inevitable misclick. |
+
+![Printable QR codes](docs/screenshots/qr-codes.png)
+
+*Physical eggs get printable QR codes. The code for each egg is derived deterministically from its
+number, so reseeding never invalidates something already printed and hidden.*
 
 ## Stack
 
@@ -151,11 +178,13 @@ npm test
 ## Seed data
 
 The seed creates twelve fictional participants (Antoni … Leon), a shop, prizes, quiz questions for a
-fictional couple, and the easter eggs. Avatars are deterministic identicons generated from the name
-by `scripts/generate-avatars.mjs`:
+fictional couple, and the easter eggs. Every image in the repository is generated rather than
+photographed: avatars are deterministic identicons derived from the participant's name, and the
+easter egg icon is drawn procedurally.
 
 ```bash
 node scripts/generate-avatars.mjs antoni borys cezary
+node scripts/generate-egg-icon.mjs
 ```
 
 Easter egg codes are derived deterministically from the egg number, so the same seed always yields
