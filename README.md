@@ -1,8 +1,8 @@
 # Bachelor Companion
 
-A companion web app for a bachelor party weekend: an in-app currency, a shop, tournaments with a
-double-bracket layout, 1v1 duels, a two-sided quiz and a hunt for hidden easter eggs — all driven
-from a single admin panel while guests follow along on their phones.
+A companion web app for a bachelor party weekend: an in-app currency with a whole economy behind it,
+a shop, tournaments with a double-bracket layout, 1v1 duels, a two-sided quiz and a hunt for hidden
+easter eggs — all driven from a single admin panel while guests follow along on their phones.
 
 Built as a real, used-in-anger side project. The interface is in Polish; the code and this document
 are in English.
