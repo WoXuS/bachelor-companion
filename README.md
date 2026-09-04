@@ -127,6 +127,35 @@ expiry claim, verified via Web Crypto so the same code runs in middleware (Edge)
 handlers. Protection is layered: middleware denies every non-GET API request except an explicit
 public allowlist, and each route additionally declares `admin: true`.
 
+## Demo mode
+
+The app can run as a public demo where anyone may open the admin panel and break things, because the
+database is rebuilt on a schedule. It is off unless `DEMO_MODE=true`, and the flag is read at
+request time, so the same build behaves correctly in both roles.
+
+Turning it on does three things: the login page grows a passwordless **enter as admin** button, a
+banner tells visitors the data is fictional and resets, and `POST /api/demo/reset` starts accepting
+calls. Everything else — including how destructive the admin panel is — stays exactly as it is in
+production. That is the point: a read-only demo would hide the only part worth showing.
+
+The reset wipes every table, re-seeds the fixtures, then replays a scripted scenario so a visitor
+lands on something worth looking at rather than an empty shop: a 12-player tournament with two
+rounds played and a losers bracket generated, purchases, a transfer, a claimed easter egg, quiz
+answers, and a discount plus a per-item override so the pricing rules are visible. It is idempotent
+— running it twice leaves the same numbers.
+
+The endpoint is protected by `CRON_SECRET` as a bearer token and refuses to run without one. A
+GitHub Actions workflow (`.github/workflows/demo-reset.yml`) calls it hourly; set the repository
+secrets `CRON_SECRET` and `DEMO_RESET_URL`. On Vercel you can use a `vercel.json` cron entry
+instead, though the Hobby plan limits cron to once a day.
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://your-demo-host/api/demo/reset
+```
+
+Never set `DEMO_MODE=true` on an instance holding data you care about — the reset is destructive by
+design, and the admin panel is unauthenticated.
+
 ## Running locally
 
 Requires Node 20+ and a PostgreSQL database.
@@ -163,13 +192,15 @@ stays quiet.
 | `npm run lint` | ESLint |
 | `npm run db:migrate` | apply migrations |
 | `npm run db:seed` | seed the database |
+| `npm run db:reset-demo` | wipe and rebuild the demo scenario |
 
 ## Tests
 
 Vitest covers the logic that is worth protecting and can run without a database: bracket
 construction and seeding order, price rounding, session token signing and expiry, the route
-helper's validation and authorisation, the API client's error handling, and the ledger rules
-(overdraft refusal, reversal netting) against an in-memory stand-in for the Prisma client.
+helper's validation and authorisation, the API client's error handling, the ledger rules
+(overdraft refusal, reversal netting) against an in-memory stand-in for the Prisma client, and the
+demo endpoints staying dead unless `DEMO_MODE` is exactly `true`.
 
 ```bash
 npm test
