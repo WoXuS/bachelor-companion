@@ -6,6 +6,7 @@ import type {ParticipantDto} from '@/types/participant'
 
 export const queryKeys = {
     me: ['me'] as const,
+    demoStatus: ['demo-status'] as const,
     participants: ['participants'] as const,
     ranking: ['ranking'] as const,
     transactions: ['transactions'] as const,

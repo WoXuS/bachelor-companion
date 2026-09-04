@@ -7,7 +7,8 @@ export const config = {
 }
 
 const PUBLIC_MUTATIONS = [
-    /^\/api\/auth\/(login|logout)$/,
+    /^\/api\/auth\/(login|logout|demo-login)$/,
+    /^\/api\/demo\/reset$/,
     /^\/api\/easter-eggs\/[^/]+\/claim$/,
     /^\/api\/easter-eggs\/by-code\/[^/]+$/,
 ]

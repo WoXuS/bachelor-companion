@@ -6,6 +6,7 @@ import React from "react";
 import {Toaster} from "sonner";
 import {NavigationBar} from "@/components/ui/NavigationBar";
 import RealtimeToasts from "@/components/realtime/RealtimeToasts";
+import {DemoBanner} from "@/components/demo/DemoBanner";
 
 const inter = Inter({
     subsets: ['latin'],
@@ -27,6 +28,7 @@ export default function RootLayout({children,}: { children: React.ReactNode }) {
         <QueryProvider>
             {children}
             <NavigationBar/>
+            <DemoBanner/>
         </QueryProvider>
         <RealtimeToasts />
         <Toaster/>
